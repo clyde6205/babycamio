@@ -1,172 +1,292 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Video, VideoOff, Mic, MicOff, Wifi, WifiOff, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Video,
+  VideoOff,
+  Mic,
+  MicOff,
+  Wifi,
+  WifiOff,
+  Loader2,
+  RefreshCw,
+  Signal,
+  SignalLow,
+  SignalMedium,
+  SignalHigh,
+  Volume2,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
+import { ConnectionState, Track } from "livekit-client";
+
+const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
+  switch (quality) {
+    case "excellent":
+      return <SignalHigh className="h-4 w-4 text-green-400" />;
+    case "good":
+      return <SignalMedium className="h-4 w-4 text-green-400" />;
+    case "fair":
+      return <SignalLow className="h-4 w-4 text-yellow-400" />;
+    case "poor":
+      return <SignalLow className="h-4 w-4 text-red-400" />;
+    default:
+      return <WifiOff className="h-4 w-4 text-red-400" />;
+  }
+};
+
+const QualityLabel = ({ quality }: { quality: NetworkQuality }) => {
+  const labels: Record<NetworkQuality, string> = {
+    excellent: "4K Ultra HD",
+    good: "Full HD 1080p",
+    fair: "480p",
+    poor: "Audio Only",
+    offline: "Offline",
+  };
+  return (
+    <span className="text-[10px] uppercase tracking-wider opacity-60">
+      {labels[quality]}
+    </span>
+  );
+};
 
 const CameraView = () => {
   const { roomName } = useParams<{ roomName: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
-  const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [connectionType, setConnectionType] = useState<string>("unknown");
+  const [displayName, setDisplayName] = useState("Camera");
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerRef = useRef<number | null>(null);
 
-  // Detect network type
+  // Get user display name
   useEffect(() => {
-    const nav = navigator as any;
-    if (nav.connection) {
-      setConnectionType(nav.connection.effectiveType || nav.connection.type || "unknown");
-      nav.connection.addEventListener?.("change", () => {
-        setConnectionType(nav.connection.effectiveType || nav.connection.type || "unknown");
-      });
-    }
-  }, []);
-
-  const startCamera = async () => {
-    setConnecting(true);
-    try {
-      // Adaptive constraints based on network
-      const isLowBandwidth = ["slow-2g", "2g", "3g"].includes(connectionType);
-      const constraints: MediaStreamConstraints = {
-        video: isLowBandwidth
-          ? { width: 320, height: 240, frameRate: 10 }
-          : { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24 } },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      };
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+    const getProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/login");
+        return;
       }
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("user_id", session.user.id)
+        .single();
+      if (data?.display_name) setDisplayName(data.display_name);
+    };
+    getProfile();
+  }, [navigate]);
 
-      // Mark room as active
-      await supabase.from("rooms").update({ is_active: true }).eq("room_name", roomName);
-      setConnected(true);
+  const {
+    room,
+    connectionState,
+    networkQuality,
+    isConnecting,
+    error,
+    connect,
+    disconnect,
+    retry,
+    audioOnly,
+  } = useLiveKit({
+    roomName: roomName || "",
+    participantName: displayName,
+    isPublisher: true,
+  });
 
-      toast({
-        title: isLowBandwidth ? "Low bandwidth mode" : "Camera active",
-        description: isLowBandwidth
-          ? "Streaming at reduced quality for reliability"
-          : "Streaming in HD — room is live",
-      });
-    } catch (err: any) {
-      toast({
-        title: "Camera error",
-        description: err.message || "Could not access camera. Check permissions.",
-        variant: "destructive",
-      });
-    } finally {
-      setConnecting(false);
+  // Attach local video to element
+  useEffect(() => {
+    if (!room || connectionState !== ConnectionState.Connected) return;
+
+    const attachVideo = () => {
+      const publication = room.localParticipant.getTrackPublication(Track.Source.Camera);
+      if (publication?.track && videoRef.current) {
+        publication.track.attach(videoRef.current);
+      }
+    };
+
+    attachVideo();
+    room.localParticipant.on("trackPublished", attachVideo);
+    return () => {
+      room.localParticipant.off("trackPublished", attachVideo);
+    };
+  }, [room, connectionState]);
+
+  // Timer for live duration
+  useEffect(() => {
+    if (connectionState === ConnectionState.Connected) {
+      setElapsedTime(0);
+      timerRef.current = window.setInterval(() => {
+        setElapsedTime((t) => t + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
     }
-  };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [connectionState]);
 
-  const stopCamera = async () => {
-    stream?.getTracks().forEach((t) => t.stop());
-    setStream(null);
-    setConnected(false);
-    await supabase.from("rooms").update({ is_active: false }).eq("room_name", roomName);
-  };
+  // Mark room active/inactive
+  useEffect(() => {
+    if (connectionState === ConnectionState.Connected) {
+      supabase.from("rooms").update({ is_active: true }).eq("room_name", roomName);
+    }
+    return () => {
+      supabase.from("rooms").update({ is_active: false }).eq("room_name", roomName);
+    };
+  }, [connectionState, roomName]);
 
-  const toggleVideo = () => {
-    if (stream) {
-      stream.getVideoTracks().forEach((t) => (t.enabled = !t.enabled));
+  const toggleVideo = useCallback(() => {
+    if (room) {
+      room.localParticipant.setCameraEnabled(!videoEnabled);
       setVideoEnabled(!videoEnabled);
     }
-  };
+  }, [room, videoEnabled]);
 
-  const toggleAudio = () => {
-    if (stream) {
-      stream.getAudioTracks().forEach((t) => (t.enabled = !t.enabled));
+  const toggleAudio = useCallback(() => {
+    if (room) {
+      room.localParticipant.setMicrophoneEnabled(!audioEnabled);
       setAudioEnabled(!audioEnabled);
     }
+  }, [room, audioEnabled]);
+
+  const handleDisconnect = async () => {
+    disconnect();
+    await supabase.from("rooms").update({ is_active: false }).eq("room_name", roomName);
+    navigate("/dashboard");
   };
 
-  useEffect(() => {
-    return () => {
-      stream?.getTracks().forEach((t) => t.stop());
-    };
-  }, [stream]);
+  const formatTime = (s: number) => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return `${h > 0 ? `${h}:` : ""}${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+  };
 
-  const networkIcon = ["slow-2g", "2g", "3g"].includes(connectionType) ? WifiOff : Wifi;
-  const NetworkIcon = networkIcon;
+  const isConnected = connectionState === ConnectionState.Connected;
+  const isReconnecting = connectionState === ConnectionState.Reconnecting;
+  const friendlyName = roomName?.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ") || "Room";
 
   return (
-    <div className="flex min-h-screen flex-col bg-black text-white">
-      {/* Top bar */}
-      <header className="flex items-center justify-between px-4 py-3">
-        <button
-          onClick={() => {
-            stopCamera();
-            navigate("/dashboard");
-          }}
-          className="touch-target flex items-center gap-2"
-        >
+    <div className="flex min-h-[100dvh] flex-col bg-black text-white select-none">
+      {/* Status bar */}
+      <header className="relative z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
+        <button onClick={handleDisconnect} className="touch-target flex items-center gap-2">
           <ArrowLeft className="h-5 w-5" />
-          <span className="text-sm">Back</span>
         </button>
-        <div className="flex items-center gap-2 text-xs">
-          <NetworkIcon className="h-4 w-4" />
-          <span className="uppercase">{connectionType}</span>
-          {connected && <span className="h-2 w-2 rounded-full bg-green-500" />}
+
+        <div className="flex items-center gap-3">
+          {isConnected && (
+            <div className="flex items-center gap-1.5 rounded-full bg-red-600/90 px-3 py-1">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+              <span className="text-xs font-bold">LIVE</span>
+              <span className="text-xs tabular-nums">{formatTime(elapsedTime)}</span>
+            </div>
+          )}
+          {isReconnecting && (
+            <div className="flex items-center gap-1.5 rounded-full bg-yellow-600/90 px-3 py-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span className="text-xs font-bold">RECONNECTING</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <NetworkQualityIcon quality={networkQuality} />
+          <QualityLabel quality={networkQuality} />
         </div>
       </header>
 
       {/* Video area */}
-      <div className="relative flex flex-1 items-center justify-center">
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          className="h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
         />
-        {!connected && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80">
-            <Video className="h-16 w-16 text-[hsl(var(--brand-blue-light))]" />
-            <p className="text-lg font-semibold">
-              {roomName?.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")}
-            </p>
-            <Button
-              size="lg"
-              onClick={startCamera}
-              disabled={connecting}
-              className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white touch-target"
-            >
-              {connecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Video className="mr-2 h-4 w-4" />}
-              Go Live
-            </Button>
+
+        {/* Audio-only overlay */}
+        {audioOnly && isConnected && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
+            <Volume2 className="mb-3 h-16 w-16 text-[hsl(213,80%,70%)]" />
+            <p className="text-lg font-semibold">Audio Only Mode</p>
+            <p className="text-sm text-white/50">Low bandwidth detected — video paused</p>
+          </div>
+        )}
+
+        {/* Pre-connect state */}
+        {!isConnected && !isReconnecting && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 brand-gradient">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-[hsl(213,80%,70%)]/30 bg-white/5">
+              <Video className="h-12 w-12 text-[hsl(213,80%,70%)]" />
+            </div>
+            <div className="text-center">
+              <h2 className="mb-1 text-xl font-bold capitalize">{friendlyName}</h2>
+              <p className="text-sm text-white/50">
+                {networkQuality === "excellent" ? "4K Ultra HD ready" : 
+                 networkQuality === "good" ? "Full HD ready" :
+                 networkQuality === "fair" ? "Standard quality" : "Low bandwidth mode"}
+              </p>
+            </div>
+
+            {error && (
+              <div className="rounded-lg bg-red-500/20 px-4 py-2 text-center">
+                <p className="text-sm text-red-300">{error}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Button
+                size="lg"
+                onClick={error ? retry : connect}
+                disabled={isConnecting}
+                className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target"
+              >
+                {isConnecting ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : error ? (
+                  <RefreshCw className="mr-2 h-5 w-5" />
+                ) : (
+                  <Video className="mr-2 h-5 w-5" />
+                )}
+                {isConnecting ? "Connecting..." : error ? "Retry" : "Go Live"}
+              </Button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Controls */}
-      {connected && (
-        <div className="safe-bottom flex items-center justify-center gap-6 bg-black/90 px-4 py-4">
-          <button onClick={toggleVideo} className="touch-target flex flex-col items-center gap-1">
-            {videoEnabled ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6 text-red-400" />}
-            <span className="text-[10px]">Video</span>
-          </button>
-          <button onClick={toggleAudio} className="touch-target flex flex-col items-center gap-1">
-            {audioEnabled ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6 text-red-400" />}
-            <span className="text-[10px]">Audio</span>
-          </button>
-          <button
-            onClick={stopCamera}
-            className="touch-target flex h-14 w-14 items-center justify-center rounded-full bg-red-600"
-          >
-            <VideoOff className="h-6 w-6" />
-          </button>
+      {/* Controls dock */}
+      {isConnected && (
+        <div className="safe-bottom bg-gradient-to-t from-black/90 to-transparent px-6 pb-4 pt-6">
+          <div className="flex items-center justify-center gap-8">
+            <button onClick={toggleVideo} className="touch-target flex flex-col items-center gap-1.5">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${videoEnabled ? "bg-white/15" : "bg-red-500/80"}`}>
+                {videoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+              </div>
+              <span className="text-[10px] opacity-60">{videoEnabled ? "Camera" : "Off"}</span>
+            </button>
+
+            <button onClick={toggleAudio} className="touch-target flex flex-col items-center gap-1.5">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${audioEnabled ? "bg-white/15" : "bg-red-500/80"}`}>
+                {audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+              </div>
+              <span className="text-[10px] opacity-60">{audioEnabled ? "Mic" : "Muted"}</span>
+            </button>
+
+            <button onClick={handleDisconnect} className="touch-target flex flex-col items-center gap-1.5">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-600/30">
+                <VideoOff className="h-6 w-6" />
+              </div>
+              <span className="text-[10px] opacity-60">End</span>
+            </button>
+          </div>
         </div>
       )}
     </div>
