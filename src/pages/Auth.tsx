@@ -28,6 +28,12 @@ const Auth = ({ mode }: AuthProps) => {
     setLoading(true);
 
     try {
+      // Sign out any existing anonymous session first
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.user?.is_anonymous) {
+        await supabase.auth.signOut();
+      }
+
       if (mode === "signup") {
         const { error, data } = await supabase.auth.signUp({
           email,
