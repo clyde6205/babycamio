@@ -38,6 +38,187 @@ export type Database = {
         }
         Relationships: []
       }
+      baby_care_logs: {
+        Row: {
+          created_at: string
+          duration_minutes: number | null
+          id: string
+          log_type: string
+          logged_at: string
+          notes: string | null
+          subtype: string | null
+          user_id: string
+          value: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          log_type?: string
+          logged_at?: string
+          notes?: string | null
+          subtype?: string | null
+          user_id: string
+          value?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          log_type?: string
+          logged_at?: string
+          notes?: string | null
+          subtype?: string | null
+          user_id?: string
+          value?: string | null
+        }
+        Relationships: []
+      }
+      baby_profiles: {
+        Row: {
+          created_at: string
+          date_of_birth: string | null
+          gender: string | null
+          id: string
+          name: string
+          photo_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date_of_birth?: string | null
+          gender?: string | null
+          id?: string
+          name: string
+          photo_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date_of_birth?: string | null
+          gender?: string | null
+          id?: string
+          name?: string
+          photo_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      caregiver_access: {
+        Row: {
+          access_level: string
+          caregiver_email: string
+          caregiver_name: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          is_active: boolean
+          owner_id: string
+        }
+        Insert: {
+          access_level?: string
+          caregiver_email: string
+          caregiver_name?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          is_active?: boolean
+          owner_id: string
+        }
+        Update: {
+          access_level?: string
+          caregiver_email?: string
+          caregiver_name?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          owner_id?: string
+        }
+        Relationships: []
+      }
+      growth_measurements: {
+        Row: {
+          baby_id: string
+          created_at: string
+          head_cm: number | null
+          height_cm: number | null
+          id: string
+          measured_at: string
+          user_id: string
+          weight_kg: number | null
+        }
+        Insert: {
+          baby_id: string
+          created_at?: string
+          head_cm?: number | null
+          height_cm?: number | null
+          id?: string
+          measured_at?: string
+          user_id: string
+          weight_kg?: number | null
+        }
+        Update: {
+          baby_id?: string
+          created_at?: string
+          head_cm?: number | null
+          height_cm?: number | null
+          id?: string
+          measured_at?: string
+          user_id?: string
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "growth_measurements_baby_id_fkey"
+            columns: ["baby_id"]
+            isOneToOne: false
+            referencedRelation: "baby_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      milestones: {
+        Row: {
+          achieved_at: string | null
+          baby_id: string
+          created_at: string
+          id: string
+          milestone_key: string
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          achieved_at?: string | null
+          baby_id: string
+          created_at?: string
+          id?: string
+          milestone_key: string
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          achieved_at?: string | null
+          baby_id?: string
+          created_at?: string
+          id?: string
+          milestone_key?: string
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "milestones_baby_id_fkey"
+            columns: ["baby_id"]
+            isOneToOne: false
+            referencedRelation: "baby_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount_cents: number

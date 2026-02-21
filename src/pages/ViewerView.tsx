@@ -13,6 +13,7 @@ import { ConnectionState, RoomEvent, Track } from "livekit-client";
 import TalkbackButton from "@/components/TalkbackButton";
 import NightVisionToggle from "@/components/NightVisionToggle";
 import LullabyPlayer from "@/components/LullabyPlayer";
+import ConnectionStatus from "@/components/ConnectionStatus";
 
 const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
   switch (quality) {
@@ -159,7 +160,10 @@ const ViewerView = () => {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2"><NetworkQualityIcon quality={networkQuality} /></div>
+        <div className="flex items-center gap-2">
+          <ConnectionStatus connectionState={connectionState} />
+          <NetworkQualityIcon quality={networkQuality} />
+        </div>
       </header>
 
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
