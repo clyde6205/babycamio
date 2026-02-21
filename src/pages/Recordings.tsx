@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
+import { useSubscription } from "@/hooks/use-subscription";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trash2, Play, CloudOff, Loader2, Film } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, Trash2, Play, Loader2, Film, HardDrive, Crown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Recording {
@@ -18,11 +20,18 @@ interface Recording {
   created_at: string;
 }
 
+// Storage limits in bytes
+const STORAGE_LIMITS = {
+  free: 500 * 1024 * 1024,   // 500 MB
+  pro: 10 * 1024 * 1024 * 1024, // 10 GB
+};
+
 const Recordings = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAutoAuth();
+  const { isPro } = useSubscription();
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -30,7 +39,7 @@ const Recordings = () => {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    const fetch = async () => {
+    const fetchData = async () => {
       const { data, error } = await supabase
         .from("recordings")
         .select("*")
@@ -39,22 +48,18 @@ const Recordings = () => {
       if (!error && data) setRecordings(data);
       setLoading(false);
     };
-    fetch();
+    fetchData();
   }, [user, authLoading]);
 
+  const storageUsed = useMemo(() => recordings.reduce((sum, r) => sum + r.file_size_bytes, 0), [recordings]);
+  const storageLimit = isPro ? STORAGE_LIMITS.pro : STORAGE_LIMITS.free;
+  const usagePercent = Math.min((storageUsed / storageLimit) * 100, 100);
+
   const playRecording = async (rec: Recording) => {
-    if (playingId === rec.id) {
-      setPlayingId(null);
-      setVideoUrl(null);
-      return;
-    }
+    if (playingId === rec.id) { setPlayingId(null); setVideoUrl(null); return; }
     const { data } = await supabase.storage.from("recordings").createSignedUrl(rec.file_path, 3600);
-    if (data?.signedUrl) {
-      setVideoUrl(data.signedUrl);
-      setPlayingId(rec.id);
-    } else {
-      toast({ title: "Failed to load recording", variant: "destructive" });
-    }
+    if (data?.signedUrl) { setVideoUrl(data.signedUrl); setPlayingId(rec.id); }
+    else toast({ title: "Failed to load recording", variant: "destructive" });
   };
 
   const deleteRecording = async (rec: Recording) => {
@@ -68,7 +73,8 @@ const Recordings = () => {
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
   };
 
   const formatDuration = (s: number) => {
@@ -87,8 +93,48 @@ const Recordings = () => {
         <span className="ml-auto text-sm text-muted-foreground">{recordings.length} clips</span>
       </header>
 
+      {/* Storage Usage Card */}
+      <div className="px-4 pt-4">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <HardDrive className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Cloud Storage</span>
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">
+              {isPro ? "Pro" : "Free"} Plan
+            </span>
+          </div>
+          <Progress value={usagePercent} className="h-2.5 mb-2" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {formatSize(storageUsed)} / {formatSize(storageLimit)} used
+            </span>
+            {usagePercent >= 90 && !isPro && (
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs text-primary"
+                onClick={() => navigate("/pricing")}
+              >
+                <Crown className="h-3 w-3 mr-1" />
+                Upgrade for 10 GB
+              </Button>
+            )}
+            {usagePercent >= 90 && isPro && (
+              <span className="text-xs text-destructive font-medium">Almost full</span>
+            )}
+          </div>
+          {usagePercent >= 100 && (
+            <p className="text-xs text-destructive mt-2 font-medium">
+              Storage full — delete old recordings or upgrade to continue saving clips.
+            </p>
+          )}
+        </div>
+      </div>
+
       {playingId && videoUrl && (
-        <div className="bg-black">
+        <div className="bg-black mt-3">
           <video src={videoUrl} controls autoPlay className="w-full max-h-[40vh] object-contain" />
         </div>
       )}
@@ -126,7 +172,7 @@ const Recordings = () => {
                     <div className="flex items-center gap-3 mt-1.5">
                       <span className="text-xs text-muted-foreground">{formatDuration(rec.duration_seconds)}</span>
                       <span className="text-xs text-muted-foreground">{formatSize(rec.file_size_bytes)}</span>
-                      <span className="text-xs rounded-full bg-orange-500/10 text-orange-500 px-2 py-0.5 font-medium">
+                      <span className="text-xs rounded-full bg-primary/10 text-primary px-2 py-0.5 font-medium">
                         {rec.trigger_type}
                       </span>
                     </div>

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
+import { useSubscription } from "@/hooks/use-subscription";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Video, VideoOff, Mic, MicOff, Wifi, WifiOff, Loader2, RefreshCw,
@@ -56,6 +57,8 @@ const CameraView = () => {
   const countdownRef = useRef<number | null>(null);
 
   const { user: autoUser, loading: authLoading } = useAutoAuth();
+  const { isPro } = useSubscription();
+  const storageLimitBytes = isPro ? 10 * 1024 * 1024 * 1024 : 500 * 1024 * 1024;
 
   useEffect(() => {
     if (authLoading || !autoUser) return;
@@ -128,6 +131,24 @@ const CameraView = () => {
         const fileName = `babycam-motion-${ts}.${ext}`;
         const filePath = `${autoUser!.id}/${fileName}`;
         const sizeMB = (blob.size / 1024 / 1024).toFixed(1);
+
+        // Check storage usage before uploading
+        const { data: usageData } = await supabase
+          .from("recordings")
+          .select("file_size_bytes")
+          .eq("user_id", autoUser!.id);
+        const currentUsage = (usageData || []).reduce((sum, r) => sum + (r.file_size_bytes || 0), 0);
+
+        if (currentUsage + blob.size > storageLimitBytes) {
+          // Over limit — fallback to local download
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = fileName;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          toast({ title: "Storage full", description: `Cloud limit reached. Recording saved locally (${sizeMB} MB).`, variant: "destructive" });
+          return;
+        }
 
         toast({ title: "Uploading recording…", description: `${sizeMB} MB to cloud storage` });
 
