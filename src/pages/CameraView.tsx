@@ -106,11 +106,74 @@ const CameraView = () => {
     { threshold: motionSensitivity, minMotionPercent: motionMinPercent, cooldown: 3000 }
   );
 
+  // Send motion data + log sleep event + trigger cry detection
   useEffect(() => {
     if (!isMotionDetected || !room || connectionState !== ConnectionState.Connected) return;
     const payload = JSON.stringify({ type: "motion", level: motionLevel, ts: Date.now() });
     const encoder = new TextEncoder();
     room.localParticipant.publishData(encoder.encode(payload), { reliable: true });
+
+    // Log sleep event for analytics
+    if (autoUser) {
+      supabase.from("sleep_events").insert({
+        user_id: autoUser.id,
+        room_name: roomName || "",
+        event_type: "motion",
+        intensity: motionLevel,
+      }).then(() => {});
+    }
+
+    // Trigger AI cry detection
+    if (autoUser && motionLevel > 3) {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) return;
+        fetch(`https://${projectId}.supabase.co/functions/v1/ai-cry-detection`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            audioLevel: motionLevel * 10,
+            motionLevel,
+            roomName: roomName || "",
+            timestamp: new Date().toISOString(),
+          }),
+        }).then(r => r.json()).then(result => {
+          if (result.classification === "crying" || result.classification === "fussing") {
+            // Send cry alert to viewers
+            const cryPayload = JSON.stringify({ type: "cry_detection", classification: result.classification, confidence: result.confidence });
+            room.localParticipant.publishData(encoder.encode(cryPayload), { reliable: true });
+
+            // Log cry event
+            supabase.from("sleep_events").insert({
+              user_id: autoUser.id,
+              room_name: roomName || "",
+              event_type: "cry",
+              intensity: result.confidence || 0.8,
+            }).then(() => {});
+
+            // Send push notification
+            fetch(`https://${projectId}.supabase.co/functions/v1/send-push-notification`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+                apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              },
+              body: JSON.stringify({
+                userId: autoUser.id,
+                roomName: roomName || "",
+                alertType: "cry",
+                message: `Baby is ${result.classification} in ${roomName?.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")}`,
+              }),
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+      });
+    }
   }, [isMotionDetected, room, connectionState, motionLevel]);
 
   const startRecording = useCallback(() => {

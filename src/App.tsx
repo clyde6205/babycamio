@@ -20,6 +20,9 @@ import MeasureTool from "./pages/MeasureTool";
 import LevelTool from "./pages/LevelTool";
 import AIAssistant from "./pages/AIAssistant";
 import Recordings from "./pages/Recordings";
+import SleepAnalytics from "./pages/SleepAnalytics";
+import FamilyCircle from "./pages/FamilyCircle";
+import ReferralPage from "./pages/ReferralPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -55,6 +58,9 @@ const App = () => {
           <Route path="/tools/level" element={<LevelTool />} />
           <Route path="/ai" element={<AIAssistant />} />
           <Route path="/recordings" element={<Recordings />} />
+          <Route path="/sleep" element={<SleepAnalytics />} />
+          <Route path="/family" element={<FamilyCircle />} />
+          <Route path="/referral" element={<ReferralPage />} />
           <Route path="/camera/:roomName" element={<CameraView />} />
           <Route path="/viewer/:roomName" element={<ViewerView />} />
           <Route path="*" element={<NotFound />} />

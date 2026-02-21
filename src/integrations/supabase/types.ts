@@ -211,6 +211,39 @@ export type Database = {
         }
         Relationships: []
       }
+      referrals: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          referral_code: string
+          referred_email: string | null
+          referred_user_id: string | null
+          referrer_id: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          referral_code: string
+          referred_email?: string | null
+          referred_user_id?: string | null
+          referrer_id: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          referral_code?: string
+          referred_email?: string | null
+          referred_user_id?: string | null
+          referrer_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       rooms: {
         Row: {
           created_at: string
@@ -278,6 +311,71 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      shared_recordings: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string
+          id: string
+          recording_id: string
+          shared_by: string
+          shared_with_email: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          recording_id: string
+          shared_by: string
+          shared_with_email: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          recording_id?: string
+          shared_by?: string
+          shared_with_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_recordings_recording_id_fkey"
+            columns: ["recording_id"]
+            isOneToOne: false
+            referencedRelation: "recordings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sleep_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          intensity: number
+          room_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          intensity?: number
+          room_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          intensity?: number
+          room_name?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       subscriptions: {
         Row: {

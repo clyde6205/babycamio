@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Video, ArrowLeft, Save, Loader2, Eye, EyeOff, Check, AlertCircle, Settings as SettingsIcon, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import BatteryGuide from "@/components/BatteryGuide";
 
 interface ProviderConfig {
   id: string; name: string; icon: string; description: string;
@@ -329,6 +330,11 @@ const Settings = () => {
             <Check className="h-3 w-3" /> {t("settings.configured")}
           </span>
         </Card>
+
+        {/* Battery Optimization Guide */}
+        <div className="mt-6">
+          <BatteryGuide />
+        </div>
       </main>
     </div>
   );

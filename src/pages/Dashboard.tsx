@@ -5,13 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield, Ruler, Crosshair, Bot, Film } from "lucide-react";
+import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield, Ruler, Crosshair, Bot, Film, Moon, Heart, Gift, BatteryCharging, Users } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import ShareDialog from "@/components/ShareDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import AdBanner from "@/components/AdBanner";
+import MultiCameraGrid from "@/components/MultiCameraGrid";
+import OnboardingWizard from "@/components/OnboardingWizard";
 
 interface Room {
   id: string;
@@ -33,7 +35,14 @@ const Dashboard = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const { isPro } = useSubscription();
+
+  useEffect(() => {
+    if (!localStorage.getItem("babycam_onboarded")) {
+      setShowOnboarding(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -98,6 +107,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-5 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <Video className="h-6 w-6 text-primary" />
@@ -193,6 +203,9 @@ const Dashboard = () => {
           </div>
         )}
 
+        {/* Multi-Camera Grid */}
+        <MultiCameraGrid rooms={rooms} />
+
         <div className="mt-8 mb-4">
           <h2 className="text-lg font-bold mb-1">{t("dashboard.handyTools")}</h2>
           <p className="text-xs text-muted-foreground">{t("dashboard.handyToolsDesc")}</p>
@@ -201,6 +214,18 @@ const Dashboard = () => {
           <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/recordings")}>
             <Film className="h-6 w-6 text-primary" />
             <span className="text-xs font-medium text-center">Recordings</span>
+          </Card>
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/sleep")}>
+            <Moon className="h-6 w-6 text-indigo-400" />
+            <span className="text-xs font-medium text-center">Sleep</span>
+          </Card>
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/family")}>
+            <Heart className="h-6 w-6 text-red-400" />
+            <span className="text-xs font-medium text-center">Family</span>
+          </Card>
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/referral")}>
+            <Gift className="h-6 w-6 text-yellow-400" />
+            <span className="text-xs font-medium text-center">Refer</span>
           </Card>
           <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/tools/measure")}>
             <Ruler className="h-6 w-6 text-primary" />
@@ -213,6 +238,10 @@ const Dashboard = () => {
           <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/ai")}>
             <Bot className="h-6 w-6 text-primary" />
             <span className="text-xs font-medium text-center">{t("dashboard.aiAssistant")}</span>
+          </Card>
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/settings")}>
+            <BatteryCharging className="h-6 w-6 text-green-400" />
+            <span className="text-xs font-medium text-center">Battery</span>
           </Card>
         </div>
       </main>

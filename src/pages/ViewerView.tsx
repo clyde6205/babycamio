@@ -6,10 +6,13 @@ import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Eye, Volume2, VolumeX, Loader2, RefreshCw, Maximize2, Minimize2,
-  SignalHigh, SignalMedium, SignalLow, WifiOff, Activity,
+  SignalHigh, SignalMedium, SignalLow, WifiOff, Activity, Baby,
 } from "lucide-react";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
 import { ConnectionState, RoomEvent, Track } from "livekit-client";
+import TalkbackButton from "@/components/TalkbackButton";
+import NightVisionToggle from "@/components/NightVisionToggle";
+import LullabyPlayer from "@/components/LullabyPlayer";
 
 const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
   switch (quality) {
@@ -36,6 +39,7 @@ const ViewerView = () => {
 
   const [motionAlert, setMotionAlert] = useState(false);
   const [motionLevel, setMotionLevel] = useState(0);
+  const [cryAlert, setCryAlert] = useState<string | null>(null);
   const motionTimeoutRef = useRef<number | null>(null);
 
   const { user: autoUser, loading: authLoading } = useAutoAuth();
@@ -64,6 +68,10 @@ const ViewerView = () => {
           if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
           if (motionTimeoutRef.current) clearTimeout(motionTimeoutRef.current);
           motionTimeoutRef.current = window.setTimeout(() => setMotionAlert(false), 4000);
+        } else if (msg.type === "cry_detection") {
+          setCryAlert(msg.classification);
+          if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
+          setTimeout(() => setCryAlert(null), 6000);
         }
       } catch { /* ignore */ }
     };
@@ -118,6 +126,19 @@ const ViewerView = () => {
         </div>
       )}
       {motionAlert && <div className="fixed inset-0 z-40 pointer-events-none border-4 border-orange-500 animate-pulse rounded-none" />}
+
+      {cryAlert && (
+        <div className="fixed inset-0 z-50 pointer-events-none flex items-start justify-center pt-32">
+          <div className="pointer-events-auto animate-bounce rounded-2xl bg-red-500/95 px-6 py-4 shadow-2xl shadow-red-500/40 flex items-center gap-3">
+            <Baby className="h-8 w-8 text-white animate-pulse" />
+            <div>
+              <p className="text-lg font-bold text-white">Baby {cryAlert === "crying" ? "is Crying!" : "is Fussing"}</p>
+              <p className="text-sm text-white/80">Check on your little one</p>
+            </div>
+          </div>
+        </div>
+      )}
+      {cryAlert && <div className="fixed inset-0 z-40 pointer-events-none border-4 border-red-500 animate-pulse rounded-none" />}
 
       <header className="relative z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
         <button onClick={handleDisconnect} className="touch-target flex items-center gap-2"><ArrowLeft className="h-5 w-5" /></button>
@@ -179,13 +200,16 @@ const ViewerView = () => {
 
       {isConnected && (
         <div className="safe-bottom bg-gradient-to-t from-black/90 to-transparent px-6 pb-4 pt-6">
-          <div className="flex items-center justify-center gap-8">
+          <div className="flex items-center justify-center gap-5">
             <button onClick={() => setMuted(!muted)} className="touch-target flex flex-col items-center gap-1.5">
               <div className={`flex h-12 w-12 items-center justify-center rounded-full ${muted ? "bg-red-500/80" : "bg-white/15"}`}>
                 {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
               </div>
               <span className="text-[10px] opacity-60">{muted ? t("viewer.unmute") : t("viewer.sound")}</span>
             </button>
+            <TalkbackButton room={room} isConnected={isConnected} />
+            <NightVisionToggle videoRef={videoRef} />
+            <LullabyPlayer room={room} isConnected={isConnected} />
             <button onClick={toggleFullscreen} className="touch-target flex flex-col items-center gap-1.5">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15">
                 {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
