@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.send-push-notification]
 verify_jwt = false
+
+[functions.create-bitpay-checkout]
+verify_jwt = false
+
+[functions.bitpay-webhook]
+verify_jwt = false
