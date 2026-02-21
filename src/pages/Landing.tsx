@@ -129,9 +129,38 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Disclaimer banner */}
+      <section className="px-5 md:px-8">
+        <div className="mx-auto max-w-5xl rounded-xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur-sm">
+          <p className="text-xs text-primary-foreground/40 leading-relaxed">
+            <strong className="text-primary-foreground/60">Important:</strong> BabyCam.io is a monitoring tool and is not a substitute for 
+            in-person supervision of children. See our{" "}
+            <button onClick={() => navigate("/disclaimer")} className="text-[hsl(var(--brand-blue-light))] underline">
+              full disclaimer
+            </button>{" "}
+            for details.
+          </p>
+        </div>
+      </section>
+
       {/* Footer */}
-      <footer className="border-t border-white/10 px-5 py-6 text-center text-sm text-primary-foreground/40">
-        © {new Date().getFullYear()} BabyCam.io — Professional Monitoring Solutions
+      <footer className="border-t border-white/10 px-5 py-6 mt-12">
+        <div className="mx-auto max-w-5xl flex flex-col items-center gap-4 md:flex-row md:justify-between">
+          <p className="text-sm text-primary-foreground/40">
+            © {new Date().getFullYear()} BabyCam.io™ — All Rights Reserved.
+          </p>
+          <div className="flex gap-4">
+            <button onClick={() => navigate("/terms")} className="text-xs text-primary-foreground/40 hover:text-primary-foreground/70 underline">
+              Terms of Service
+            </button>
+            <button onClick={() => navigate("/privacy")} className="text-xs text-primary-foreground/40 hover:text-primary-foreground/70 underline">
+              Privacy Policy
+            </button>
+            <button onClick={() => navigate("/disclaimer")} className="text-xs text-primary-foreground/40 hover:text-primary-foreground/70 underline">
+              Disclaimer
+            </button>
+          </div>
+        </div>
       </footer>
     </div>
   );

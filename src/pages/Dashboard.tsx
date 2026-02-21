@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings } from "lucide-react";
+import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
+import ShareDialog from "@/components/ShareDialog";
 import type { User } from "@supabase/supabase-js";
 
 interface Room {
@@ -27,6 +28,7 @@ const Dashboard = () => {
   const [newRoomName, setNewRoomName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { isPro } = useSubscription();
 
   useEffect(() => {
@@ -37,6 +39,14 @@ const Dashboard = () => {
         return;
       }
       setUser(session.user);
+
+      // Check admin role
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", session.user.id);
+      if (roles?.some((r: any) => r.role === "admin")) setIsAdmin(true);
+
       await fetchRooms();
     };
     checkAuth();
@@ -117,6 +127,11 @@ const Dashboard = () => {
               <Crown className="h-4 w-4 mr-1" /> Upgrade
             </Button>
           )}
+          {isAdmin && (
+            <Button variant="ghost" size="icon" onClick={() => navigate("/admin")} className="touch-target" title="Founder's Console">
+              <Shield className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="touch-target" title="Settings">
             <Settings className="h-4 w-4" />
           </Button>
@@ -187,6 +202,9 @@ const Dashboard = () => {
                     </p>
                   </div>
                   <div className="flex gap-1">
+                    {user && (
+                      <ShareDialog roomId={room.id} roomName={room.room_name} userId={user.id} />
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -227,6 +245,10 @@ const Dashboard = () => {
           </div>
         )}
       </main>
+
+      <footer className="border-t px-5 py-4 text-center text-xs text-muted-foreground">
+        © {new Date().getFullYear()} BabyCam.io™ — All Rights Reserved.
+      </footer>
     </div>
   );
 };
