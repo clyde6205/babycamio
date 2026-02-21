@@ -14,7 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      rooms: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          owner_id: string
+          room_name: string
+          room_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          owner_id: string
+          room_name: string
+          room_type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          owner_id?: string
+          room_name?: string
+          room_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      shared_access: {
+        Row: {
+          access_code: string
+          created_at: string
+          granted_by: string
+          id: string
+          is_active: boolean
+          room_id: string
+          shared_with_email: string
+        }
+        Insert: {
+          access_code: string
+          created_at?: string
+          granted_by: string
+          id?: string
+          is_active?: boolean
+          room_id: string
+          shared_with_email: string
+        }
+        Update: {
+          access_code?: string
+          created_at?: string
+          granted_by?: string
+          id?: string
+          is_active?: boolean
+          room_id?: string
+          shared_with_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_access_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
