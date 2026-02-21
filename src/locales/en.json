@@ -147,7 +147,16 @@
     "choosePayment": "Choose Payment Method",
     "bankGrade": "Bank-Grade Security",
     "available190": "Available in 190+ Countries",
-    "support247": "24/7 Support"
+    "support247": "24/7 Support",
+    "freeFeatures": ["1 Camera Room", "720p Streaming", "Ad-Supported", "Basic Alerts", "Community Support"],
+    "proFeatures": ["Unlimited Rooms", "4K Ultra HD Streaming", "No Ads Ever", "AI Cry Detection", "Two-Way Audio", "Priority Support 24/7", "Multi-Viewer Access", "Cloud Recording (Coming Soon)"],
+    "creditDebit": "Credit/Debit Card",
+    "paypal": "PayPal",
+    "gcashMaya": "GCash / Maya",
+    "mpesa": "M-Pesa",
+    "global": "Global",
+    "philippines": "Philippines",
+    "africaRegions": "Kenya, Tanzania, Africa"
   },
   "settings": {
     "title": "Settings",

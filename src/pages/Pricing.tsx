@@ -9,22 +9,6 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
-const FREE_FEATURES = [
-  "1 Camera Room", "720p Streaming", "Ad-Supported", "Basic Alerts", "Community Support",
-];
-
-const PRO_FEATURES = [
-  "Unlimited Rooms", "4K Ultra HD Streaming", "No Ads Ever", "AI Cry Detection",
-  "Two-Way Audio", "Priority Support 24/7", "Multi-Viewer Access", "Cloud Recording (Coming Soon)",
-];
-
-const PAYMENT_PROVIDERS = [
-  { id: "stripe", name: "Credit/Debit Card", icon: "💳", regions: "Global" },
-  { id: "paypal", name: "PayPal", icon: "🅿️", regions: "Global" },
-  { id: "paymongo", name: "GCash / Maya", icon: "🇵🇭", regions: "Philippines" },
-  { id: "mpesa", name: "M-Pesa", icon: "🇰🇪", regions: "Kenya, Tanzania, Africa" },
-];
-
 const Pricing = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -88,8 +72,8 @@ const Pricing = () => {
               </div>
             </div>
             <ul className="mb-8 space-y-3">
-              {FREE_FEATURES.map((f) => (
-                <li key={f} className="flex items-center gap-2 text-sm">
+              {(t("pricing.freeFeatures", { returnObjects: true }) as string[]).map((f, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm">
                   <Check className="h-4 w-4 text-[hsl(var(--brand-blue-light))]" /> {f}
                 </li>
               ))}
@@ -117,8 +101,8 @@ const Pricing = () => {
               </div>
             </div>
             <ul className="mb-8 space-y-3">
-              {PRO_FEATURES.map((f) => (
-                <li key={f} className="flex items-center gap-2 text-sm">
+              {(t("pricing.proFeatures", { returnObjects: true }) as string[]).map((f, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm">
                   <Check className="h-4 w-4 text-yellow-400" /> {f}
                 </li>
               ))}
@@ -131,10 +115,15 @@ const Pricing = () => {
             ) : (
               <div className="space-y-2">
                 <p className="mb-2 text-xs font-medium text-primary-foreground/60 uppercase tracking-wider">{t("pricing.choosePayment")}</p>
-                {PAYMENT_PROVIDERS.map((p) => (
+                {[
+                  { id: "stripe", nameKey: "pricing.creditDebit", icon: "💳", regionKey: "pricing.global" },
+                  { id: "paypal", nameKey: "pricing.paypal", icon: "🅿️", regionKey: "pricing.global" },
+                  { id: "paymongo", nameKey: "pricing.gcashMaya", icon: "🇵🇭", regionKey: "pricing.philippines" },
+                  { id: "mpesa", nameKey: "pricing.mpesa", icon: "🇰🇪", regionKey: "pricing.africaRegions" },
+                ].map((p) => (
                   <Button key={p.id} className="w-full justify-between bg-white/10 hover:bg-white/20 text-primary-foreground font-medium touch-target" onClick={() => handleSubscribe(p.id)} disabled={processing}>
-                    <span className="flex items-center gap-2"><span className="text-lg">{p.icon}</span>{p.name}</span>
-                    <span className="text-xs text-primary-foreground/40">{p.regions}</span>
+                    <span className="flex items-center gap-2"><span className="text-lg">{p.icon}</span>{t(p.nameKey)}</span>
+                    <span className="text-xs text-primary-foreground/40">{t(p.regionKey)}</span>
                   </Button>
                 ))}
               </div>
