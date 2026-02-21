@@ -6,8 +6,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PLAN_PRICES: Record<string, number> = {
-  pro: 997, // $9.97 in cents
+const PLAN_PRICES: Record<string, Record<string, number>> = {
+  pro: {
+    monthly: 997,  // $9.97 in cents
+    annual: 8900,  // $89.00 in cents
+  },
 };
 
 async function getProviderKeys(supabase: any, userId: string, provider: string): Promise<Record<string, string>> {
@@ -51,7 +54,7 @@ serve(async (req) => {
       });
     }
 
-    const { provider, plan } = await req.json();
+    const { provider, plan, billing = "monthly" } = await req.json();
 
     if (!provider || !plan || !PLAN_PRICES[plan]) {
       return new Response(JSON.stringify({ error: "Invalid plan or provider" }), {
@@ -59,6 +62,10 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const priceAmount = PLAN_PRICES[plan][billing] || PLAN_PRICES[plan].monthly;
+    const interval = billing === "annual" ? "year" : "month";
+    const priceLabel = billing === "annual" ? "$89.00/year" : "$9.97/month";
 
     // Try env vars first, then fall back to DB-stored keys
     const dbKeys = await getProviderKeys(supabase, user.id, provider);
@@ -88,11 +95,12 @@ serve(async (req) => {
             "customer_email": user.email!,
             "metadata[user_id]": user.id,
             "metadata[plan]": plan,
+            "metadata[billing]": billing,
             "line_items[0][price_data][currency]": "usd",
-            "line_items[0][price_data][unit_amount]": PLAN_PRICES[plan].toString(),
-            "line_items[0][price_data][recurring][interval]": "month",
-            "line_items[0][price_data][product_data][name]": "BabyCam Pro",
-            "line_items[0][price_data][product_data][description]": "Enterprise-grade 4K baby monitoring",
+            "line_items[0][price_data][unit_amount]": priceAmount.toString(),
+            "line_items[0][price_data][recurring][interval]": interval,
+            "line_items[0][price_data][product_data][name]": `BabyCam Pro (${billing === "annual" ? "Annual" : "Monthly"})`,
+            "line_items[0][price_data][product_data][description]": `Enterprise-grade 4K baby monitoring — ${priceLabel}`,
             "line_items[0][quantity]": "1",
             "success_url": `${origin}/dashboard?payment=success`,
             "cancel_url": `${origin}/pricing?payment=canceled`,
@@ -147,8 +155,8 @@ serve(async (req) => {
           body: JSON.stringify({
             intent: "CAPTURE",
             purchase_units: [{
-              amount: { currency_code: "USD", value: "9.97" },
-              description: "BabyCam Pro Monthly",
+              amount: { currency_code: "USD", value: billing === "annual" ? "89.00" : "9.97" },
+              description: `BabyCam Pro ${billing === "annual" ? "Annual" : "Monthly"}`,
               custom_id: user.id,
             }],
             application_context: {
@@ -195,8 +203,8 @@ serve(async (req) => {
             data: {
               attributes: {
                 line_items: [{
-                  name: "BabyCam Pro Monthly",
-                  amount: PLAN_PRICES[plan],
+                  name: `BabyCam Pro ${billing === "annual" ? "Annual" : "Monthly"}`,
+                  amount: priceAmount,
                   currency: "PHP",
                   quantity: 1,
                 }],
