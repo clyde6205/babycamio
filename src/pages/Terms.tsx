@@ -1,8 +1,10 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, Video } from "lucide-react";
 
 const Terms = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-background">
@@ -19,42 +21,42 @@ const Terms = () => {
       </header>
 
       <main className="mx-auto max-w-3xl px-5 py-8 prose prose-sm dark:prose-invert">
-        <h1>Terms of Service</h1>
-        <p className="text-muted-foreground">Last updated: {new Date().toLocaleDateString()}</p>
+        <h1>{t("terms.title")}</h1>
+        <p className="text-muted-foreground">{t("terms.lastUpdated")} {new Date().toLocaleDateString()}</p>
 
-        <h2>1. Acceptance of Terms</h2>
-        <p>By accessing or using BabyCam.io ("the Service"), you agree to be bound by these Terms of Service. If you do not agree, do not use the Service.</p>
+        <h2>{t("terms.acceptance")}</h2>
+        <p>{t("terms.acceptanceText")}</p>
 
-        <h2>2. Description of Service</h2>
-        <p>BabyCam.io provides live video monitoring services using enterprise-grade streaming technology. The Service allows users to set up cameras and share access with authorized viewers.</p>
+        <h2>{t("terms.description")}</h2>
+        <p>{t("terms.descriptionText")}</p>
 
-        <h2>3. User Accounts</h2>
-        <p>You must provide accurate information when creating an account. You are responsible for maintaining the security of your account credentials. You must be at least 18 years old to use this Service.</p>
+        <h2>{t("terms.userAccounts")}</h2>
+        <p>{t("terms.userAccountsText")}</p>
 
-        <h2>4. Privacy & Data</h2>
-        <p>Video streams are transmitted using end-to-end encrypted connections. We do not store or record your video streams unless explicitly enabled by you. See our <button onClick={() => navigate("/privacy")} className="text-primary underline">Privacy Policy</button> for details.</p>
+        <h2>{t("terms.privacyData")}</h2>
+        <p>{t("terms.privacyDataText")} <button onClick={() => navigate("/privacy")} className="text-primary underline">{t("terms.privacyLink")}</button> {t("terms.privacyDataSuffix")}</p>
 
-        <h2>5. Acceptable Use</h2>
-        <p>You agree to use the Service only for lawful monitoring purposes (e.g., baby monitoring, home security). You must not use the Service to surveil individuals without their knowledge or consent where prohibited by law.</p>
+        <h2>{t("terms.acceptableUse")}</h2>
+        <p>{t("terms.acceptableUseText")}</p>
 
-        <h2>6. Subscription & Payments</h2>
-        <p>Free accounts include limited features with ad support. Pro subscriptions are billed monthly at the listed rate. You may cancel at any time; access continues until the end of the billing period.</p>
+        <h2>{t("terms.subscriptionPayments")}</h2>
+        <p>{t("terms.subscriptionPaymentsText")}</p>
 
-        <h2>7. Disclaimer of Warranties</h2>
-        <p>THE SERVICE IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND. We do not guarantee uninterrupted or error-free service. BabyCam.io is not a substitute for in-person supervision of children.</p>
+        <h2>{t("terms.disclaimerWarranties")}</h2>
+        <p>{t("terms.disclaimerWarrantiesText")}</p>
 
-        <h2>8. Limitation of Liability</h2>
-        <p>IN NO EVENT SHALL BABYCAM.IO BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES ARISING FROM YOUR USE OF THE SERVICE.</p>
+        <h2>{t("terms.limitationLiability")}</h2>
+        <p>{t("terms.limitationLiabilityText")}</p>
 
-        <h2>9. Changes to Terms</h2>
-        <p>We may update these terms at any time. Continued use after changes constitutes acceptance of the new terms.</p>
+        <h2>{t("terms.changesToTerms")}</h2>
+        <p>{t("terms.changesToTermsText")}</p>
 
-        <h2>10. Contact</h2>
-        <p>Questions about these terms? Contact us at <strong>legal@babycam.io</strong>.</p>
+        <h2>{t("terms.contact")}</h2>
+        <p>{t("terms.contactText")} <strong>legal@babycam.io</strong>.</p>
       </main>
 
       <footer className="border-t px-5 py-6 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} BabyCam.io™ — All Rights Reserved.
+        {t("common.copyright", { year: new Date().getFullYear() })}
       </footer>
     </div>
   );

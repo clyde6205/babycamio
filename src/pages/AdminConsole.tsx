@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -45,6 +46,7 @@ interface SubRow {
 
 const AdminConsole = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,9 +110,9 @@ const AdminConsole = () => {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background gap-4">
         <AlertTriangle className="h-16 w-16 text-destructive" />
-        <h1 className="text-2xl font-bold">Access Denied</h1>
-        <p className="text-muted-foreground">You don't have admin privileges.</p>
-        <Button onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
+        <h1 className="text-2xl font-bold">{t("admin.accessDenied")}</h1>
+        <p className="text-muted-foreground">{t("admin.noPrivileges")}</p>
+        <Button onClick={() => navigate("/dashboard")}>{t("admin.backToDashboard")}</Button>
       </div>
     );
   }
@@ -128,7 +130,7 @@ const AdminConsole = () => {
         <div className="flex items-center gap-2">
           <Shield className="h-6 w-6 text-primary" />
           <span className="text-lg font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            Founder's Console
+            {t("admin.title")}
           </span>
         </div>
       </header>
@@ -137,10 +139,10 @@ const AdminConsole = () => {
         {/* Stats */}
         <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
-            { label: "Total Users", value: stats.users, icon: Users },
-            { label: "Total Rooms", value: stats.rooms, icon: MonitorPlay },
-            { label: "Active Now", value: stats.activeRooms, icon: Video },
-            { label: "Pro Subscribers", value: stats.proUsers, icon: CreditCard },
+            { label: t("admin.totalUsers"), value: stats.users, icon: Users },
+            { label: t("admin.totalRooms"), value: stats.rooms, icon: MonitorPlay },
+            { label: t("admin.activeNow"), value: stats.activeRooms, icon: Video },
+            { label: t("admin.proSubscribers"), value: stats.proUsers, icon: CreditCard },
           ].map(({ label, value, icon: Icon }) => (
             <Card key={label} className="p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -158,16 +160,16 @@ const AdminConsole = () => {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search users, rooms..."
+            placeholder={t("admin.searchPlaceholder")}
             className="pl-10"
           />
         </div>
 
         <Tabs defaultValue="users">
           <TabsList className="mb-4">
-            <TabsTrigger value="users">Users ({profiles.length})</TabsTrigger>
-            <TabsTrigger value="rooms">Rooms ({rooms.length})</TabsTrigger>
-            <TabsTrigger value="subs">Subscriptions ({subscriptions.length})</TabsTrigger>
+            <TabsTrigger value="users">{t("admin.users")} ({profiles.length})</TabsTrigger>
+            <TabsTrigger value="rooms">{t("admin.rooms")} ({rooms.length})</TabsTrigger>
+            <TabsTrigger value="subs">{t("admin.subscriptions")} ({subscriptions.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -184,7 +186,7 @@ const AdminConsole = () => {
                 </Card>
               ))}
               {filteredProfiles.length === 0 && (
-                <p className="py-8 text-center text-muted-foreground">No users found</p>
+                <p className="py-8 text-center text-muted-foreground">{t("admin.noUsersFound")}</p>
               )}
             </div>
           </TabsContent>
@@ -198,7 +200,7 @@ const AdminConsole = () => {
                       {r.room_name.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {r.is_active ? "🟢 Live" : "⚫ Offline"} · {r.room_type} · Owner: {r.owner_id.slice(0, 8)}...
+                      {r.is_active ? `🟢 ${t("admin.live")}` : `⚫ ${t("admin.offline")}`} · {r.room_type} · {t("admin.owner")}: {r.owner_id.slice(0, 8)}...
                     </p>
                   </div>
                   <span className="text-xs text-muted-foreground">
@@ -207,7 +209,7 @@ const AdminConsole = () => {
                 </Card>
               ))}
               {rooms.length === 0 && (
-                <p className="py-8 text-center text-muted-foreground">No rooms</p>
+                <p className="py-8 text-center text-muted-foreground">{t("admin.noRooms")}</p>
               )}
             </div>
           </TabsContent>
@@ -228,7 +230,7 @@ const AdminConsole = () => {
                       {s.status}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      User: {s.user_id.slice(0, 8)}... · {s.payment_provider || "none"}
+                      {t("admin.user")}: {s.user_id.slice(0, 8)}... · {s.payment_provider || "none"}
                     </p>
                   </div>
                   <span className="text-xs text-muted-foreground">
@@ -237,7 +239,7 @@ const AdminConsole = () => {
                 </Card>
               ))}
               {subscriptions.length === 0 && (
-                <p className="py-8 text-center text-muted-foreground">No subscriptions</p>
+                <p className="py-8 text-center text-muted-foreground">{t("admin.noSubscriptions")}</p>
               )}
             </div>
           </TabsContent>
@@ -246,17 +248,17 @@ const AdminConsole = () => {
         {/* Disclaimers management hint */}
         <Card className="mt-8 p-4 bg-muted/30">
           <h3 className="font-semibold mb-1 flex items-center gap-2">
-            <Shield className="h-4 w-4 text-primary" /> Legal Pages
+            <Shield className="h-4 w-4 text-primary" /> {t("admin.legalPages")}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Terms of Service, Privacy Policy, and Disclaimer pages are live at{" "}
-            <code>/terms</code>, <code>/privacy</code>, and <code>/disclaimer</code>.
+            {t("admin.legalPagesDesc")}{" "}
+            <code>/terms</code>, <code>/privacy</code>, <code>/disclaimer</code>.
           </p>
         </Card>
       </main>
 
       <footer className="border-t px-5 py-4 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} BabyCam.io — All Rights Reserved. Founder's Console.
+        {t("common.copyright", { year: new Date().getFullYear() })} {t("admin.footerConsole")}.
       </footer>
     </div>
   );
