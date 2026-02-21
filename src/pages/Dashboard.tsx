@@ -11,7 +11,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import ShareDialog from "@/components/ShareDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import AdBanner from "@/components/AdBanner";
 import MultiCameraGrid from "@/components/MultiCameraGrid";
 import OnboardingWizard from "@/components/OnboardingWizard";
 
@@ -246,7 +245,6 @@ const Dashboard = () => {
         </div>
       </main>
 
-      <AdBanner />
       <footer className="border-t px-5 py-4 text-center text-xs text-muted-foreground">
         {t("common.copyright", { year: new Date().getFullYear() })}
       </footer>

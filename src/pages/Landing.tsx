@@ -107,18 +107,6 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Disclaimer banner */}
-      <section className="px-5 md:px-8">
-        <div className="mx-auto max-w-5xl rounded-xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur-sm">
-          <p className="text-xs text-primary-foreground/40 leading-relaxed">
-            <strong className="text-primary-foreground/60">Important:</strong> {t("landing.disclaimerBanner")}{" "}
-            <button onClick={() => navigate("/disclaimer")} className="text-[hsl(var(--brand-blue-light))] underline">
-              {t("landing.fullDisclaimer")}
-            </button>
-          </p>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="border-t border-white/10 px-5 py-6 mt-12">
         <div className="mx-auto max-w-5xl flex flex-col items-center gap-4 md:flex-row md:justify-between">
