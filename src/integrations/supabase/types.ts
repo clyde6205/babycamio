@@ -139,6 +139,42 @@ export type Database = {
         }
         Relationships: []
       }
+      recordings: {
+        Row: {
+          created_at: string
+          duration_seconds: number
+          file_path: string
+          file_size_bytes: number
+          id: string
+          mime_type: string
+          room_name: string
+          trigger_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number
+          file_path: string
+          file_size_bytes?: number
+          id?: string
+          mime_type?: string
+          room_name: string
+          trigger_type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number
+          file_path?: string
+          file_size_bytes?: number
+          id?: string
+          mime_type?: string
+          room_name?: string
+          trigger_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       rooms: {
         Row: {
           created_at: string
