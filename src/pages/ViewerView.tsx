@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
+import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Eye, Volume2, VolumeX, Loader2, RefreshCw, Maximize2, Minimize2,
@@ -33,49 +34,43 @@ const ViewerView = () => {
   const [displayName, setDisplayName] = useState("Viewer");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Motion alert state
   const [motionAlert, setMotionAlert] = useState(false);
   const [motionLevel, setMotionLevel] = useState(0);
   const motionTimeoutRef = useRef<number | null>(null);
 
+  const { user: autoUser, loading: authLoading } = useAutoAuth();
+
   useEffect(() => {
-    const getProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate("/login"); return; }
-      const { data } = await supabase.from("profiles").select("display_name").eq("user_id", session.user.id).single();
+    if (authLoading || !autoUser) return;
+    const loadProfile = async () => {
+      const { data } = await supabase.from("profiles").select("display_name").eq("user_id", autoUser.id).single();
       if (data?.display_name) setDisplayName(data.display_name);
     };
-    getProfile();
-  }, [navigate]);
+    loadProfile();
+  }, [autoUser, authLoading]);
 
   const { room, connectionState, networkQuality, isConnecting, error, connect, disconnect, retry, audioOnly } = useLiveKit({
     roomName: roomName || "", participantName: displayName, isPublisher: false,
   });
 
-  // Listen for motion data messages from the camera
   useEffect(() => {
     if (!room) return;
-
     const handleData = (payload: Uint8Array) => {
       try {
         const msg = JSON.parse(new TextDecoder().decode(payload));
         if (msg.type === "motion") {
           setMotionAlert(true);
           setMotionLevel(msg.level || 0);
-          // Vibrate if supported
           if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-          // Clear after 4 seconds
           if (motionTimeoutRef.current) clearTimeout(motionTimeoutRef.current);
           motionTimeoutRef.current = window.setTimeout(() => setMotionAlert(false), 4000);
         }
-      } catch { /* ignore non-json */ }
+      } catch { /* ignore */ }
     };
-
     room.on(RoomEvent.DataReceived, handleData);
     return () => { room.off(RoomEvent.DataReceived, handleData); };
   }, [room]);
 
-  // Handle remote tracks
   useEffect(() => {
     if (!room) return;
     room.on(RoomEvent.TrackSubscribed, (track) => {
@@ -111,7 +106,6 @@ const ViewerView = () => {
 
   return (
     <div ref={containerRef} className="flex min-h-[100dvh] flex-col bg-black text-white select-none">
-      {/* Motion alert overlay */}
       {motionAlert && (
         <div className="fixed inset-0 z-50 pointer-events-none flex items-start justify-center pt-20">
           <div className="pointer-events-auto animate-bounce rounded-2xl bg-orange-500/95 px-6 py-4 shadow-2xl shadow-orange-500/40 flex items-center gap-3">
@@ -123,31 +117,24 @@ const ViewerView = () => {
           </div>
         </div>
       )}
-
-      {/* Motion border glow effect */}
-      {motionAlert && (
-        <div className="fixed inset-0 z-40 pointer-events-none border-4 border-orange-500 animate-pulse rounded-none" />
-      )}
+      {motionAlert && <div className="fixed inset-0 z-40 pointer-events-none border-4 border-orange-500 animate-pulse rounded-none" />}
 
       <header className="relative z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
         <button onClick={handleDisconnect} className="touch-target flex items-center gap-2"><ArrowLeft className="h-5 w-5" /></button>
         <div className="flex items-center gap-2">
           {isConnected && hasRemoteVideo && (
             <div className="flex items-center gap-1.5 rounded-full bg-green-600/80 px-3 py-1">
-              <span className="h-2 w-2 rounded-full bg-white" />
-              <span className="text-xs font-bold">{t("viewer.watching")}</span>
+              <span className="h-2 w-2 rounded-full bg-white" /><span className="text-xs font-bold">{t("viewer.watching")}</span>
             </div>
           )}
           {motionAlert && (
             <div className="flex items-center gap-1.5 rounded-full bg-orange-500/90 px-3 py-1 animate-pulse">
-              <Activity className="h-3 w-3" />
-              <span className="text-xs font-bold">MOTION</span>
+              <Activity className="h-3 w-3" /><span className="text-xs font-bold">MOTION</span>
             </div>
           )}
           {isReconnecting && (
             <div className="flex items-center gap-1.5 rounded-full bg-yellow-600/80 px-3 py-1">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span className="text-xs font-bold">{t("camera.reconnecting")}</span>
+              <Loader2 className="h-3 w-3 animate-spin" /><span className="text-xs font-bold">{t("camera.reconnecting")}</span>
             </div>
           )}
         </div>
@@ -157,7 +144,6 @@ const ViewerView = () => {
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
         <video ref={videoRef} autoPlay playsInline muted={muted} className={`absolute inset-0 h-full w-full object-contain bg-black ${!hasRemoteVideo ? "hidden" : ""}`} />
         <audio ref={audioRef} autoPlay muted={muted} className="hidden" />
-
         {isConnected && !hasRemoteVideo && (
           <div className="flex flex-col items-center justify-center gap-3">
             {hasRemoteAudio ? (
@@ -169,14 +155,10 @@ const ViewerView = () => {
                 <p className="text-sm text-white/50">{t("viewer.audioOnlyDesc")}</p>
               </>
             ) : (
-              <>
-                <Loader2 className="h-10 w-10 animate-spin text-white/30" />
-                <p className="text-sm text-white/50">{t("viewer.waitingCamera")}</p>
-              </>
+              <><Loader2 className="h-10 w-10 animate-spin text-white/30" /><p className="text-sm text-white/50">{t("viewer.waitingCamera")}</p></>
             )}
           </div>
         )}
-
         {!isConnected && !isReconnecting && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 brand-gradient">
             <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-[hsl(213,80%,70%)]/30 bg-white/5">
@@ -186,11 +168,7 @@ const ViewerView = () => {
               <h2 className="mb-1 text-xl font-bold capitalize">{friendlyName}</h2>
               <p className="text-sm text-white/50">{t("viewer.connectToView")}</p>
             </div>
-            {error && (
-              <div className="rounded-lg bg-red-500/20 px-4 py-2 text-center">
-                <p className="text-sm text-red-300">{error}</p>
-              </div>
-            )}
+            {error && (<div className="rounded-lg bg-red-500/20 px-4 py-2 text-center"><p className="text-sm text-red-300">{error}</p></div>)}
             <Button size="lg" onClick={error ? retry : connect} disabled={isConnecting} className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target">
               {isConnecting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : error ? <RefreshCw className="mr-2 h-5 w-5" /> : <Eye className="mr-2 h-5 w-5" />}
               {isConnecting ? t("camera.connecting") : error ? t("camera.retry") : t("viewer.watchLive")}

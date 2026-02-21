@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
+import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [user, setUser] = useState<any>(null);
+  const { user, loading: authLoading } = useAutoAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [keyValues, setKeyValues] = useState<Record<string, Record<string, string>>>({});
@@ -44,14 +45,12 @@ const Settings = () => {
   const [cameraSettingsLoaded, setCameraSettingsLoaded] = useState(false);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate("/login"); return; }
-      setUser(session.user);
-      await Promise.all([loadKeys(session.user.id), loadCameraSettings(session.user.id)]);
+      await Promise.all([loadKeys(user.id), loadCameraSettings(user.id)]);
     };
     init();
-  }, [navigate]);
+  }, [user, authLoading]);
 
   const loadCameraSettings = async (userId: string) => {
     // Load global limits
