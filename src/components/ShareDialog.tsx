@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ interface ShareDialogProps {
 }
 
 const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -76,12 +78,12 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
       setEmail("");
       await loadSharedUsers();
       toast({
-        title: "Access shared",
+        title: t("share.accessShared"),
         description: `${email} can now view this room with code: ${code}`,
       });
     } catch (err: any) {
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: err.message,
         variant: "destructive",
       });
@@ -99,7 +101,7 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
       setSharedUsers((prev) =>
         prev.map((u) => (u.id === id ? { ...u, is_active: false } : u))
       );
-      toast({ title: "Access revoked" });
+      toast({ title: t("share.accessRevoked") });
     }
   };
 
@@ -120,22 +122,21 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="capitalize">Share "{friendlyName}"</DialogTitle>
+          <DialogTitle className="capitalize">{t("share.shareRoom", { name: friendlyName })}</DialogTitle>
           <DialogDescription>
-            Invite viewers by email. They'll receive an access code to watch the stream.
+            {t("share.inviteDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Add new viewer */}
           <div className="space-y-2">
-            <Label>Invite Viewer</Label>
+            <Label>{t("share.inviteViewer")}</Label>
             <div className="flex gap-2">
               <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="viewer@example.com"
+                placeholder={t("share.emailPlaceholder")}
                 onKeyDown={(e) => e.key === "Enter" && shareRoom()}
               />
               <Button onClick={shareRoom} disabled={sharing} size="sm">
@@ -148,10 +149,9 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
             </div>
           </div>
 
-          {/* Shared users list */}
           <div className="space-y-2">
             <Label className="text-muted-foreground text-xs uppercase tracking-wider">
-              Shared With ({sharedUsers.filter((u) => u.is_active).length})
+              {t("share.sharedWith", { count: sharedUsers.filter((u) => u.is_active).length })}
             </Label>
             {loading ? (
               <div className="py-4 text-center">
@@ -159,7 +159,7 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
               </div>
             ) : sharedUsers.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground">
-                No viewers shared yet
+                {t("share.noViewers")}
               </p>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -195,7 +195,7 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Revoked</span>
+                      <span className="text-xs text-muted-foreground">{t("share.revoked")}</span>
                     )}
                   </div>
                 ))}
@@ -203,11 +203,10 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
             )}
           </div>
 
-          {/* Share link info */}
           <div className="rounded-lg bg-muted/50 p-3">
             <p className="text-xs text-muted-foreground">
-              Viewers must sign up with the invited email address and navigate to{" "}
-              <code className="text-foreground">/viewer/{roomName}</code> to watch.
+              {t("share.viewerNote")}{" "}
+              <code className="text-foreground">/viewer/{roomName}</code>
             </p>
           </div>
         </div>
