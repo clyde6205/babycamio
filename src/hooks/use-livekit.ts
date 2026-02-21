@@ -138,6 +138,7 @@ export const useLiveKit = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioOnly, setAudioOnly] = useState(false);
+  const [roomInstance, setRoomInstance] = useState<Room | null>(null);
   const roomRef = useRef<Room | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
 
@@ -213,6 +214,7 @@ export const useLiveKit = ({
 
       room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
         setConnectionState(ConnectionState.Disconnected);
+        setRoomInstance(null);
         if (reason && reason !== DisconnectReason.CLIENT_INITIATED) {
           setError("Connection lost. Tap retry to reconnect.");
         }
@@ -224,6 +226,7 @@ export const useLiveKit = ({
 
       await room.connect(url, token);
       setConnectionState(ConnectionState.Connected);
+      setRoomInstance(room);
 
       if (isPublisher) {
         // Enable camera + mic
@@ -252,6 +255,7 @@ export const useLiveKit = ({
       roomRef.current.disconnect(true);
       roomRef.current = null;
     }
+    setRoomInstance(null);
     setConnectionState(ConnectionState.Disconnected);
     setError(null);
   }, []);
@@ -272,7 +276,7 @@ export const useLiveKit = ({
   }, []);
 
   return {
-    room: roomRef.current,
+    room: roomInstance,
     connectionState,
     networkQuality,
     isConnecting,

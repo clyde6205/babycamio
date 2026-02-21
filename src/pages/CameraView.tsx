@@ -76,9 +76,15 @@ const CameraView = () => {
 
   useEffect(() => {
     if (connectionState === ConnectionState.Connected) {
-      supabase.from("rooms").update({ is_active: true }).eq("room_name", roomName);
+      supabase.from("rooms").update({ is_active: true }).eq("room_name", roomName).then(({ error }) => {
+        if (error) console.warn("Failed to set room active:", error.message);
+      });
     }
-    return () => { supabase.from("rooms").update({ is_active: false }).eq("room_name", roomName); };
+    return () => {
+      supabase.from("rooms").update({ is_active: false }).eq("room_name", roomName).then(({ error }) => {
+        if (error) console.warn("Failed to set room inactive:", error.message);
+      });
+    };
   }, [connectionState, roomName]);
 
   const toggleVideo = useCallback(() => {
