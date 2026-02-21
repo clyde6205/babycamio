@@ -13,6 +13,7 @@ import { Video, ArrowLeft, Save, Loader2, Eye, EyeOff, Check, AlertCircle, Setti
 import { useToast } from "@/hooks/use-toast";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import BatteryGuide from "@/components/BatteryGuide";
+import CopyrightFooter from "@/components/CopyrightFooter";
 
 interface ProviderConfig {
   id: string; name: string; icon: string; description: string;
@@ -336,6 +337,7 @@ const Settings = () => {
           <BatteryGuide />
         </div>
       </main>
+      <CopyrightFooter variant="dark" showLinks={false} />
     </div>
   );
 };

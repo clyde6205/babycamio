@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, UserPlus, Users, Clock, Trash2, Loader2, Shield, Eye, Mic,
 } from "lucide-react";
+import CopyrightFooter from "@/components/CopyrightFooter";
 
 interface CaregiverAccess {
   id: string;
@@ -206,6 +207,7 @@ const CaregiverMode = () => {
           </div>
         )}
       </main>
+      <CopyrightFooter variant="dark" showLinks={false} />
     </div>
   );
 };
