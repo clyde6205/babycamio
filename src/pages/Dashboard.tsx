@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown } from "lucide-react";
+import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@supabase/supabase-js";
@@ -117,6 +117,9 @@ const Dashboard = () => {
               <Crown className="h-4 w-4 mr-1" /> Upgrade
             </Button>
           )}
+          <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="touch-target" title="Settings">
+            <Settings className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="sm" onClick={handleLogout} className="touch-target">
             <LogOut className="h-4 w-4" />
           </Button>
