@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import CopyrightFooter from "@/components/CopyrightFooter";
 
 const Pricing = () => {
   const navigate = useNavigate();
@@ -193,9 +194,7 @@ const Pricing = () => {
         </div>
       </main>
 
-      <footer className="border-t border-white/10 px-5 py-6 text-center text-sm text-primary-foreground/40">
-        {t("common.copyright", { year: new Date().getFullYear() })}
-      </footer>
+      <CopyrightFooter variant="light" />
     </div>
   );
 };

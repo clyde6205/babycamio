@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Video, ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import CopyrightFooter from "@/components/CopyrightFooter";
 
 interface AuthProps {
   mode: "login" | "signup";
@@ -114,6 +115,7 @@ const Auth = ({ mode }: AuthProps) => {
           </p>
         </div>
       </div>
+      <CopyrightFooter variant="light" showLinks={false} />
     </div>
   );
 };

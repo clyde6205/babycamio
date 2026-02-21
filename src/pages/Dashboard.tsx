@@ -13,6 +13,7 @@ import ShareDialog from "@/components/ShareDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import MultiCameraGrid from "@/components/MultiCameraGrid";
 import OnboardingWizard from "@/components/OnboardingWizard";
+import CopyrightFooter from "@/components/CopyrightFooter";
 
 interface Room {
   id: string;
@@ -257,9 +258,7 @@ const Dashboard = () => {
         </div>
       </main>
 
-      <footer className="border-t px-5 py-4 text-center text-xs text-muted-foreground">
-        {t("common.copyright", { year: new Date().getFullYear() })}
-      </footer>
+      <CopyrightFooter variant="dark" showLinks={false} />
     </div>
   );
 };

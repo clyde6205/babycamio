@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Shield, Video, Wifi, WifiOff, Volume2, Bell, Star, Download, CheckCircle2, Globe } from "lucide-react";
 import heroImage from "@/assets/babycam-hero.webp";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import CopyrightFooter from "@/components/CopyrightFooter";
 
 const TESTIMONIALS = [
   { name: "Sarah M.", country: "🇺🇸 USA", stars: 5, text: "Finally a baby monitor that works on our terrible rural Wi-Fi. Audio fallback is a lifesaver at 2AM." },
@@ -162,25 +163,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-white/10 px-5 py-6 mt-12">
-        <div className="mx-auto max-w-5xl flex flex-col items-center gap-4 md:flex-row md:justify-between">
-          <p className="text-sm text-primary-foreground/40">
-            {t("landing.copyright", { year: new Date().getFullYear() })}
-          </p>
-          <div className="flex gap-4">
-            <button onClick={() => navigate("/terms")} className="text-xs text-primary-foreground/40 hover:text-primary-foreground/70 underline">
-              {t("landing.terms")}
-            </button>
-            <button onClick={() => navigate("/privacy")} className="text-xs text-primary-foreground/40 hover:text-primary-foreground/70 underline">
-              {t("landing.privacy")}
-            </button>
-            <button onClick={() => navigate("/disclaimer")} className="text-xs text-primary-foreground/40 hover:text-primary-foreground/70 underline">
-              {t("landing.disclaimer")}
-            </button>
-          </div>
-        </div>
-      </footer>
+      <CopyrightFooter variant="light" />
     </div>
   );
 };
