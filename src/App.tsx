@@ -7,7 +7,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { RTL_LANGUAGES } from "@/i18n";
 import Landing from "./pages/Landing";
-import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import CameraView from "./pages/CameraView";
 import ViewerView from "./pages/ViewerView";
@@ -42,8 +41,8 @@ const App = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Auth mode="login" />} />
-          <Route path="/signup" element={<Auth mode="signup" />} />
+          <Route path="/login" element={<Dashboard />} />
+          <Route path="/signup" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/settings" element={<Settings />} />

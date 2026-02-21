@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
+import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Video, VideoOff, Mic, MicOff, Wifi, WifiOff, Loader2, RefreshCw,
@@ -54,21 +55,21 @@ const CameraView = () => {
   const recordingTimerRef = useRef<number | null>(null);
   const countdownRef = useRef<number | null>(null);
 
+  const { user: autoUser, loading: authLoading } = useAutoAuth();
+
   useEffect(() => {
-    const getProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate("/login"); return; }
-      const { data } = await supabase.from("profiles").select("display_name").eq("user_id", session.user.id).single();
+    if (authLoading || !autoUser) return;
+
+    const loadSettings = async () => {
+      const { data } = await supabase.from("profiles").select("display_name").eq("user_id", autoUser.id).single();
       if (data?.display_name) setDisplayName(data.display_name);
 
-      // Load user camera settings
       const { data: userSettings } = await supabase
         .from("user_camera_settings")
         .select("*")
-        .eq("user_id", session.user.id)
+        .eq("user_id", autoUser.id)
         .single();
 
-      // Load global admin settings
       const { data: globalSettings } = await supabase
         .from("app_settings")
         .select("setting_value")
@@ -78,7 +79,6 @@ const CameraView = () => {
       const global = globalSettings?.setting_value as any;
       if (global) {
         setMaxDurationMin(global.max_duration_minutes || 60);
-        // Use global defaults unless user has overridden
         if (!userSettings) {
           setRecordingDurationMin(global.default_duration_minutes || 5);
           setMotionSensitivity(global.motion_sensitivity || 25);
@@ -91,20 +91,18 @@ const CameraView = () => {
         setMotionSensitivity(userSettings.motion_sensitivity);
       }
     };
-    getProfile();
-  }, [navigate]);
+    loadSettings();
+  }, [autoUser, authLoading]);
 
   const { room, connectionState, networkQuality, isConnecting, error, connect, disconnect, retry, audioOnly } = useLiveKit({
     roomName: roomName || "", participantName: displayName, isPublisher: true,
   });
 
-  // Motion detection
   const { isMotionDetected, motionLevel, enabled: motionEnabled, setEnabled: setMotionEnabled } = useMotionDetection(
     videoRef.current,
     { threshold: motionSensitivity, minMotionPercent: motionMinPercent, cooldown: 3000 }
   );
 
-  // Send motion event to viewers via data channel
   useEffect(() => {
     if (!isMotionDetected || !room || connectionState !== ConnectionState.Connected) return;
     const payload = JSON.stringify({ type: "motion", level: motionLevel, ts: Date.now() });
@@ -112,27 +110,17 @@ const CameraView = () => {
     room.localParticipant.publishData(encoder.encode(payload), { reliable: true });
   }, [isMotionDetected, room, connectionState, motionLevel]);
 
-  // AUTO-RECORD on motion detection
   const startRecording = useCallback(() => {
     if (isRecording || !videoRef.current) return;
-
     const stream = videoRef.current.srcObject as MediaStream;
     if (!stream) return;
-
     const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
       ? "video/webm;codecs=vp9,opus"
-      : MediaRecorder.isTypeSupported("video/webm")
-        ? "video/webm"
-        : "video/mp4";
-
+      : MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "video/mp4";
     try {
       const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
       recordedChunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
-      };
-
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunksRef.current.push(e.data); };
       recorder.onstop = () => {
         const blob = new Blob(recordedChunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
@@ -140,63 +128,36 @@ const CameraView = () => {
         a.href = url;
         const ts = new Date().toISOString().replace(/[:.]/g, "-");
         a.download = `babycam-motion-${ts}.${mimeType.includes("webm") ? "webm" : "mp4"}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
         toast({ title: "Recording saved", description: `Motion recording downloaded (${(blob.size / 1024 / 1024).toFixed(1)} MB)` });
       };
-
-      recorder.start(1000); // collect data every second
+      recorder.start(1000);
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
-
-      const durationMs = recordingDurationMin * 60 * 1000;
       setRecordingTimeLeft(recordingDurationMin * 60);
-
-      // Countdown timer
       countdownRef.current = window.setInterval(() => {
-        setRecordingTimeLeft((prev) => {
-          if (prev <= 1) return 0;
-          return prev - 1;
-        });
+        setRecordingTimeLeft((prev) => prev <= 1 ? 0 : prev - 1);
       }, 1000);
-
-      // Auto-stop timer
-      recordingTimerRef.current = window.setTimeout(() => {
-        stopRecording();
-      }, durationMs);
-
-      console.log(`[Recording] Started - ${recordingDurationMin} min duration`);
-    } catch (err) {
-      console.error("[Recording] Failed to start:", err);
-    }
+      recordingTimerRef.current = window.setTimeout(() => { stopRecording(); }, recordingDurationMin * 60 * 1000);
+    } catch (err) { console.error("[Recording] Failed to start:", err); }
   }, [isRecording, recordingDurationMin, toast]);
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
     mediaRecorderRef.current = null;
-    setIsRecording(false);
-    setRecordingTimeLeft(0);
+    setIsRecording(false); setRecordingTimeLeft(0);
     if (recordingTimerRef.current) { clearTimeout(recordingTimerRef.current); recordingTimerRef.current = null; }
     if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
   }, []);
 
-  // Trigger recording on motion
   useEffect(() => {
-    if (isMotionDetected && motionEnabled && !isRecording && connectionState === ConnectionState.Connected) {
-      startRecording();
-    }
+    if (isMotionDetected && motionEnabled && !isRecording && connectionState === ConnectionState.Connected) startRecording();
   }, [isMotionDetected, motionEnabled, isRecording, connectionState, startRecording]);
 
-  // Clean up on unmount
   useEffect(() => {
     return () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
-      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
       if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
@@ -243,16 +204,13 @@ const CameraView = () => {
   }, [room, audioEnabled]);
 
   const handleDisconnect = async () => {
-    stopRecording();
-    disconnect();
+    stopRecording(); disconnect();
     await supabase.from("rooms").update({ is_active: false }).eq("room_name", roomName);
     navigate("/dashboard");
   };
 
   const formatTime = (s: number) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
+    const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sec = s % 60;
     return `${h > 0 ? `${h}:` : ""}${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
   };
 
@@ -263,9 +221,7 @@ const CameraView = () => {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-black text-white select-none">
       <header className="relative z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
-        <button onClick={handleDisconnect} className="touch-target flex items-center gap-2">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
+        <button onClick={handleDisconnect} className="touch-target flex items-center gap-2"><ArrowLeft className="h-5 w-5" /></button>
         <div className="flex items-center gap-3">
           {isConnected && (
             <>
@@ -276,14 +232,12 @@ const CameraView = () => {
               </div>
               {motionEnabled && isMotionDetected && (
                 <div className="flex items-center gap-1.5 rounded-full bg-orange-500/90 px-3 py-1 animate-pulse">
-                  <Activity className="h-3 w-3" />
-                  <span className="text-xs font-bold">MOTION</span>
+                  <Activity className="h-3 w-3" /><span className="text-xs font-bold">MOTION</span>
                 </div>
               )}
               {isRecording && (
                 <div className="flex items-center gap-1.5 rounded-full bg-red-500/90 px-3 py-1">
-                  <Circle className="h-3 w-3 fill-current animate-pulse" />
-                  <span className="text-xs font-bold">REC</span>
+                  <Circle className="h-3 w-3 fill-current animate-pulse" /><span className="text-xs font-bold">REC</span>
                   <span className="text-xs tabular-nums">{formatTime(recordingTimeLeft)}</span>
                 </div>
               )}
@@ -291,39 +245,28 @@ const CameraView = () => {
           )}
           {isReconnecting && (
             <div className="flex items-center gap-1.5 rounded-full bg-yellow-600/90 px-3 py-1">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span className="text-xs font-bold">{t("camera.reconnecting")}</span>
+              <Loader2 className="h-3 w-3 animate-spin" /><span className="text-xs font-bold">{t("camera.reconnecting")}</span>
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <NetworkQualityIcon quality={networkQuality} />
-          <QualityLabel quality={networkQuality} />
-        </div>
+        <div className="flex items-center gap-2"><NetworkQualityIcon quality={networkQuality} /><QualityLabel quality={networkQuality} /></div>
       </header>
 
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
         <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
-
         {isConnected && motionEnabled && (
           <div className="absolute top-2 left-2 right-2 z-10">
             <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${isMotionDetected ? "bg-orange-500" : "bg-green-500/60"}`}
-                style={{ width: `${Math.min(motionLevel * 5, 100)}%` }}
-              />
+              <div className={`h-full rounded-full transition-all duration-300 ${isMotionDetected ? "bg-orange-500" : "bg-green-500/60"}`} style={{ width: `${Math.min(motionLevel * 5, 100)}%` }} />
             </div>
           </div>
         )}
-
-        {/* Recording duration badge */}
         {isConnected && motionEnabled && !isRecording && (
           <div className="absolute top-5 right-3 z-10 rounded-lg bg-black/60 px-2.5 py-1.5 backdrop-blur-sm">
             <p className="text-[10px] text-white/60 uppercase tracking-wider">Auto-record</p>
             <p className="text-sm font-bold">{recordingDurationMin} min</p>
           </div>
         )}
-
         {audioOnly && isConnected && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
             <Volume2 className="mb-3 h-16 w-16 text-[hsl(213,80%,70%)]" />
@@ -331,7 +274,6 @@ const CameraView = () => {
             <p className="text-sm text-white/50">{t("camera.lowBandwidth")}</p>
           </div>
         )}
-
         {!isConnected && !isReconnecting && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 brand-gradient">
             <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-[hsl(213,80%,70%)]/30 bg-white/5">
@@ -343,17 +285,11 @@ const CameraView = () => {
                 {networkQuality === "excellent" ? t("camera.ready4k") : networkQuality === "good" ? t("camera.readyHd") : networkQuality === "fair" ? t("camera.readyStandard") : t("camera.readyLowBandwidth")}
               </p>
             </div>
-            {error && (
-              <div className="rounded-lg bg-red-500/20 px-4 py-2 text-center">
-                <p className="text-sm text-red-300">{error}</p>
-              </div>
-            )}
-            <div className="flex gap-3">
-              <Button size="lg" onClick={error ? retry : connect} disabled={isConnecting} className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target">
-                {isConnecting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : error ? <RefreshCw className="mr-2 h-5 w-5" /> : <Video className="mr-2 h-5 w-5" />}
-                {isConnecting ? t("camera.connecting") : error ? t("camera.retry") : t("camera.goLive")}
-              </Button>
-            </div>
+            {error && (<div className="rounded-lg bg-red-500/20 px-4 py-2 text-center"><p className="text-sm text-red-300">{error}</p></div>)}
+            <Button size="lg" onClick={error ? retry : connect} disabled={isConnecting} className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target">
+              {isConnecting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : error ? <RefreshCw className="mr-2 h-5 w-5" /> : <Video className="mr-2 h-5 w-5" />}
+              {isConnecting ? t("camera.connecting") : error ? t("camera.retry") : t("camera.goLive")}
+            </Button>
           </div>
         )}
       </div>

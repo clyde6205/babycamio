@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
+import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,12 +50,12 @@ const AdminConsole = () => {
   // Per-user camera settings (admin view/edit)
   const [userCameraSettings, setUserCameraSettings] = useState<any[]>([]);
 
-  useEffect(() => {
-    const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate("/login"); return; }
+  const { user: autoUser, loading: authLoading } = useAutoAuth();
 
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", session.user.id);
+  useEffect(() => {
+    if (authLoading || !autoUser) return;
+    const init = async () => {
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", autoUser.id);
       const hasAdmin = roles?.some((r: any) => r.role === "admin") ?? false;
       setIsAdmin(hasAdmin);
 
@@ -77,7 +78,7 @@ const AdminConsole = () => {
       setLoading(false);
     };
     init();
-  }, [navigate, toast]);
+  }, [autoUser, authLoading, toast]);
 
   const saveGlobalMotionSettings = async () => {
     setSavingGlobal(true);
