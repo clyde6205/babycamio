@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield, Ruler, Crosshair, Bot } from "lucide-react";
+import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield, Ruler, Crosshair, Bot, Film } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
@@ -197,7 +197,11 @@ const Dashboard = () => {
           <h2 className="text-lg font-bold mb-1">{t("dashboard.handyTools")}</h2>
           <p className="text-xs text-muted-foreground">{t("dashboard.handyToolsDesc")}</p>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/recordings")}>
+            <Film className="h-6 w-6 text-primary" />
+            <span className="text-xs font-medium text-center">Recordings</span>
+          </Card>
           <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/tools/measure")}>
             <Ruler className="h-6 w-6 text-primary" />
             <span className="text-xs font-medium text-center">{t("dashboard.measure")}</span>
