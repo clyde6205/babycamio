@@ -45,6 +45,8 @@ i18n
 
 export default i18n;
 
+export const RTL_LANGUAGES = ["ar"];
+
 export const LANGUAGES = [
   { code: "en", name: "English", flag: "🇺🇸" },
   { code: "es", name: "Español", flag: "🇪🇸" },
