@@ -14,6 +14,9 @@ import AdminConsole from "./pages/AdminConsole";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Disclaimer from "./pages/Disclaimer";
+import MeasureTool from "./pages/MeasureTool";
+import LevelTool from "./pages/LevelTool";
+import AIAssistant from "./pages/AIAssistant";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +38,9 @@ const App = () => (
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/disclaimer" element={<Disclaimer />} />
+          <Route path="/tools/measure" element={<MeasureTool />} />
+          <Route path="/tools/level" element={<LevelTool />} />
+          <Route path="/ai" element={<AIAssistant />} />
           <Route path="/camera/:roomName" element={<CameraView />} />
           <Route path="/viewer/:roomName" element={<ViewerView />} />
           <Route path="*" element={<NotFound />} />

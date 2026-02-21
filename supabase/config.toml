@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.manage-keys]
 verify_jwt = false
+
+[functions.admin-data]
+verify_jwt = false
+
+[functions.ai-chat]
+verify_jwt = false
