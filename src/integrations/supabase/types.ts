@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          setting_key: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount_cents: number
@@ -223,6 +247,36 @@ export type Database = {
           provider_customer_id?: string | null
           provider_subscription_id?: string | null
           status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_camera_settings: {
+        Row: {
+          created_at: string
+          id: string
+          motion_enabled: boolean
+          motion_sensitivity: number
+          recording_duration_minutes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          motion_enabled?: boolean
+          motion_sensitivity?: number
+          recording_duration_minutes?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          motion_enabled?: boolean
+          motion_sensitivity?: number
+          recording_duration_minutes?: number
           updated_at?: string
           user_id?: string
         }

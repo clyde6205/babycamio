@@ -5,12 +5,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Video, VideoOff, Mic, MicOff, Wifi, WifiOff, Loader2, RefreshCw,
-  Signal, SignalLow, SignalMedium, SignalHigh, Volume2, Activity,
+  Signal, SignalLow, SignalMedium, SignalHigh, Volume2, Activity, Circle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
 import { useMotionDetection } from "@/hooks/use-motion-detection";
-import { ConnectionState, Track, DataPacket_Kind } from "livekit-client";
+import { ConnectionState, Track } from "livekit-client";
 
 const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
   switch (quality) {
@@ -42,12 +42,54 @@ const CameraView = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerRef = useRef<number | null>(null);
 
+  // Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTimeLeft, setRecordingTimeLeft] = useState(0);
+  const [recordingDurationMin, setRecordingDurationMin] = useState(5);
+  const [motionSensitivity, setMotionSensitivity] = useState(25);
+  const [motionMinPercent, setMotionMinPercent] = useState(1.5);
+  const [maxDurationMin, setMaxDurationMin] = useState(60);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<number | null>(null);
+  const countdownRef = useRef<number | null>(null);
+
   useEffect(() => {
     const getProfile = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { navigate("/login"); return; }
       const { data } = await supabase.from("profiles").select("display_name").eq("user_id", session.user.id).single();
       if (data?.display_name) setDisplayName(data.display_name);
+
+      // Load user camera settings
+      const { data: userSettings } = await supabase
+        .from("user_camera_settings")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .single();
+
+      // Load global admin settings
+      const { data: globalSettings } = await supabase
+        .from("app_settings")
+        .select("setting_value")
+        .eq("setting_key", "motion_recording")
+        .single();
+
+      const global = globalSettings?.setting_value as any;
+      if (global) {
+        setMaxDurationMin(global.max_duration_minutes || 60);
+        // Use global defaults unless user has overridden
+        if (!userSettings) {
+          setRecordingDurationMin(global.default_duration_minutes || 5);
+          setMotionSensitivity(global.motion_sensitivity || 25);
+          setMotionMinPercent(global.motion_min_percent || 1.5);
+        }
+      }
+
+      if (userSettings) {
+        setRecordingDurationMin(Math.min(userSettings.recording_duration_minutes, maxDurationMin));
+        setMotionSensitivity(userSettings.motion_sensitivity);
+      }
     };
     getProfile();
   }, [navigate]);
@@ -56,20 +98,109 @@ const CameraView = () => {
     roomName: roomName || "", participantName: displayName, isPublisher: true,
   });
 
-  // Motion detection — runs on the local video element
+  // Motion detection
   const { isMotionDetected, motionLevel, enabled: motionEnabled, setEnabled: setMotionEnabled } = useMotionDetection(
     videoRef.current,
-    { threshold: 25, minMotionPercent: 1.5, cooldown: 3000 }
+    { threshold: motionSensitivity, minMotionPercent: motionMinPercent, cooldown: 3000 }
   );
 
-  // Send motion event to all viewers via LiveKit data channel
+  // Send motion event to viewers via data channel
   useEffect(() => {
     if (!isMotionDetected || !room || connectionState !== ConnectionState.Connected) return;
     const payload = JSON.stringify({ type: "motion", level: motionLevel, ts: Date.now() });
     const encoder = new TextEncoder();
     room.localParticipant.publishData(encoder.encode(payload), { reliable: true });
-    console.log("[Motion] Detected! Level:", motionLevel);
   }, [isMotionDetected, room, connectionState, motionLevel]);
+
+  // AUTO-RECORD on motion detection
+  const startRecording = useCallback(() => {
+    if (isRecording || !videoRef.current) return;
+
+    const stream = videoRef.current.srcObject as MediaStream;
+    if (!stream) return;
+
+    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+      ? "video/webm;codecs=vp9,opus"
+      : MediaRecorder.isTypeSupported("video/webm")
+        ? "video/webm"
+        : "video/mp4";
+
+    try {
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
+      recordedChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        a.download = `babycam-motion-${ts}.${mimeType.includes("webm") ? "webm" : "mp4"}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast({ title: "Recording saved", description: `Motion recording downloaded (${(blob.size / 1024 / 1024).toFixed(1)} MB)` });
+      };
+
+      recorder.start(1000); // collect data every second
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+
+      const durationMs = recordingDurationMin * 60 * 1000;
+      setRecordingTimeLeft(recordingDurationMin * 60);
+
+      // Countdown timer
+      countdownRef.current = window.setInterval(() => {
+        setRecordingTimeLeft((prev) => {
+          if (prev <= 1) return 0;
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Auto-stop timer
+      recordingTimerRef.current = window.setTimeout(() => {
+        stopRecording();
+      }, durationMs);
+
+      console.log(`[Recording] Started - ${recordingDurationMin} min duration`);
+    } catch (err) {
+      console.error("[Recording] Failed to start:", err);
+    }
+  }, [isRecording, recordingDurationMin, toast]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    mediaRecorderRef.current = null;
+    setIsRecording(false);
+    setRecordingTimeLeft(0);
+    if (recordingTimerRef.current) { clearTimeout(recordingTimerRef.current); recordingTimerRef.current = null; }
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+  }, []);
+
+  // Trigger recording on motion
+  useEffect(() => {
+    if (isMotionDetected && motionEnabled && !isRecording && connectionState === ConnectionState.Connected) {
+      startRecording();
+    }
+  }, [isMotionDetected, motionEnabled, isRecording, connectionState, startRecording]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+      if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!room || connectionState !== ConnectionState.Connected) return;
@@ -112,6 +243,7 @@ const CameraView = () => {
   }, [room, audioEnabled]);
 
   const handleDisconnect = async () => {
+    stopRecording();
     disconnect();
     await supabase.from("rooms").update({ is_active: false }).eq("room_name", roomName);
     navigate("/dashboard");
@@ -142,11 +274,17 @@ const CameraView = () => {
                 <span className="text-xs font-bold">LIVE</span>
                 <span className="text-xs tabular-nums">{formatTime(elapsedTime)}</span>
               </div>
-              {/* Motion indicator */}
               {motionEnabled && isMotionDetected && (
                 <div className="flex items-center gap-1.5 rounded-full bg-orange-500/90 px-3 py-1 animate-pulse">
                   <Activity className="h-3 w-3" />
                   <span className="text-xs font-bold">MOTION</span>
+                </div>
+              )}
+              {isRecording && (
+                <div className="flex items-center gap-1.5 rounded-full bg-red-500/90 px-3 py-1">
+                  <Circle className="h-3 w-3 fill-current animate-pulse" />
+                  <span className="text-xs font-bold">REC</span>
+                  <span className="text-xs tabular-nums">{formatTime(recordingTimeLeft)}</span>
                 </div>
               )}
             </>
@@ -167,17 +305,22 @@ const CameraView = () => {
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
         <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
 
-        {/* Motion level bar overlay */}
         {isConnected && motionEnabled && (
           <div className="absolute top-2 left-2 right-2 z-10">
             <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  isMotionDetected ? "bg-orange-500" : "bg-green-500/60"
-                }`}
+                className={`h-full rounded-full transition-all duration-300 ${isMotionDetected ? "bg-orange-500" : "bg-green-500/60"}`}
                 style={{ width: `${Math.min(motionLevel * 5, 100)}%` }}
               />
             </div>
+          </div>
+        )}
+
+        {/* Recording duration badge */}
+        {isConnected && motionEnabled && !isRecording && (
+          <div className="absolute top-5 right-3 z-10 rounded-lg bg-black/60 px-2.5 py-1.5 backdrop-blur-sm">
+            <p className="text-[10px] text-white/60 uppercase tracking-wider">Auto-record</p>
+            <p className="text-sm font-bold">{recordingDurationMin} min</p>
           </div>
         )}
 
@@ -217,7 +360,7 @@ const CameraView = () => {
 
       {isConnected && (
         <div className="safe-bottom bg-gradient-to-t from-black/90 to-transparent px-6 pb-4 pt-6">
-          <div className="flex items-center justify-center gap-6">
+          <div className="flex items-center justify-center gap-5">
             <button onClick={toggleVideo} className="touch-target flex flex-col items-center gap-1.5">
               <div className={`flex h-12 w-12 items-center justify-center rounded-full ${videoEnabled ? "bg-white/15" : "bg-red-500/80"}`}>
                 {videoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
@@ -230,13 +373,20 @@ const CameraView = () => {
               </div>
               <span className="text-[10px] opacity-60">{audioEnabled ? t("camera.mic") : t("camera.muted")}</span>
             </button>
-            {/* Motion toggle */}
             <button onClick={() => setMotionEnabled(!motionEnabled)} className="touch-target flex flex-col items-center gap-1.5">
               <div className={`flex h-12 w-12 items-center justify-center rounded-full ${motionEnabled ? "bg-orange-500/80" : "bg-white/15"}`}>
                 <Activity className="h-5 w-5" />
               </div>
               <span className="text-[10px] opacity-60">{motionEnabled ? "Motion" : "No Motion"}</span>
             </button>
+            {isRecording && (
+              <button onClick={stopRecording} className="touch-target flex flex-col items-center gap-1.5">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/80 animate-pulse">
+                  <Circle className="h-5 w-5 fill-current" />
+                </div>
+                <span className="text-[10px] opacity-60">Stop Rec</span>
+              </button>
+            )}
             <button onClick={handleDisconnect} className="touch-target flex flex-col items-center gap-1.5">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-600/30">
                 <VideoOff className="h-6 w-6" />
