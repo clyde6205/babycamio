@@ -29,13 +29,17 @@ const Auth = ({ mode }: AuthProps) => {
 
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { error, data } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { display_name: displayName } },
         });
         if (error) throw error;
-        toast({ title: t("auth.checkEmail"), description: t("auth.checkEmailDesc") });
+        if (data.session) {
+          navigate("/dashboard");
+        } else {
+          toast({ title: t("auth.checkEmail"), description: t("auth.checkEmailDesc") });
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
