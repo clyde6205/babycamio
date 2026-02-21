@@ -80,7 +80,16 @@
     "off": "Off",
     "mic": "Mic",
     "muted": "Muted",
-    "end": "End"
+    "end": "End",
+    "quality4k": "4K Ultra HD",
+    "quality1080p": "Full HD 1080p",
+    "quality480p": "480p",
+    "qualityAudioOnly": "Audio Only",
+    "qualityOffline": "Offline",
+    "ready4k": "4K Ultra HD ready",
+    "readyHd": "Full HD ready",
+    "readyStandard": "Standard quality",
+    "readyLowBandwidth": "Low bandwidth mode"
   },
   "viewer": {
     "watchLive": "Watch Live",
@@ -170,7 +179,9 @@
     "missingKeys": "Missing keys",
     "configured": "Configured",
     "providerRemoved": "Provider removed",
-    "keysSaved": "Keys saved securely."
+    "keysSaved": "Keys saved securely.",
+    "livekitTitle": "LiveKit Streaming",
+    "livekitDesc": "LiveKit keys are managed through the backend. Current status:"
   },
   "share": {
     "shareRoom": "Share \"{{name}}\"",

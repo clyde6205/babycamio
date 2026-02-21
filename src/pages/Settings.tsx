@@ -197,9 +197,9 @@ const Settings = () => {
 
         <Card className="mt-6 p-4 bg-muted/30">
           <h3 className="font-semibold mb-1 flex items-center gap-2">
-            <SettingsIcon className="h-4 w-4" /> LiveKit Streaming
+            <SettingsIcon className="h-4 w-4" /> {t("settings.livekitTitle")}
           </h3>
-          <p className="text-sm text-muted-foreground mb-3">LiveKit keys are managed through the backend. Current status:</p>
+          <p className="text-sm text-muted-foreground mb-3">{t("settings.livekitDesc")}</p>
           <span className="flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 w-fit">
             <Check className="h-3 w-3" /> {t("settings.configured")}
           </span>

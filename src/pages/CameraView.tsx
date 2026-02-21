@@ -22,8 +22,9 @@ const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
 };
 
 const QualityLabel = ({ quality }: { quality: NetworkQuality }) => {
+  const { t } = useTranslation();
   const labels: Record<NetworkQuality, string> = {
-    excellent: "4K Ultra HD", good: "Full HD 1080p", fair: "480p", poor: "Audio Only", offline: "Offline",
+    excellent: t("camera.quality4k"), good: t("camera.quality1080p"), fair: t("camera.quality480p"), poor: t("camera.qualityAudioOnly"), offline: t("camera.qualityOffline"),
   };
   return <span className="text-[10px] uppercase tracking-wider opacity-60">{labels[quality]}</span>;
 };
@@ -151,7 +152,7 @@ const CameraView = () => {
             <div className="text-center">
               <h2 className="mb-1 text-xl font-bold capitalize">{friendlyName}</h2>
               <p className="text-sm text-white/50">
-                {networkQuality === "excellent" ? "4K Ultra HD ready" : networkQuality === "good" ? "Full HD ready" : networkQuality === "fair" ? "Standard quality" : "Low bandwidth mode"}
+                {networkQuality === "excellent" ? t("camera.ready4k") : networkQuality === "good" ? t("camera.readyHd") : networkQuality === "fair" ? t("camera.readyStandard") : t("camera.readyLowBandwidth")}
               </p>
             </div>
             {error && (
