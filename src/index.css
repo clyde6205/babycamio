@@ -153,7 +153,7 @@
     background-clip: text;
   }
 
-  /* GPU-accelerated animations for low-end Android */
+/* GPU-accelerated animations for low-end Android */
   .gpu-accelerated {
     transform: translateZ(0);
     will-change: transform;
@@ -164,4 +164,56 @@
   .ad-bottom-spacing {
     padding-bottom: 60px;
   }
+}
+
+/* ===== LOW-END DEVICE OPTIMIZATIONS ===== */
+
+/* Strip all animations & transitions for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Reduce visual complexity on low-memory / low-end devices */
+@media (max-resolution: 1.5dppx) {
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .brand-gradient {
+    background: hsl(var(--brand-navy)) !important;
+  }
+
+  .text-brand-gradient {
+    background: none !important;
+    -webkit-text-fill-color: hsl(var(--primary)) !important;
+  }
+}
+
+/* Aggressively contain layout recalc on all cards and sections */
+.contain-layout {
+  contain: layout style;
+}
+
+/* Reduce paint area for scrolling containers */
+.scroll-container {
+  contain: strict;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
+/* Optimise images for low-end: force hardware decode */
+img {
+  content-visibility: auto;
+  image-rendering: auto;
+}
+
+/* Prevent layout thrashing from font loading */
+@font-face {
+  font-display: swap;
 }
