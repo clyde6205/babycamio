@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import CameraView from "./pages/CameraView";
 import ViewerView from "./pages/ViewerView";
+import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/login" element={<Auth mode="login" />} />
           <Route path="/signup" element={<Auth mode="signup" />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/pricing" element={<Pricing />} />
           <Route path="/camera/:roomName" element={<CameraView />} />
           <Route path="/viewer/:roomName" element={<ViewerView />} />
           <Route path="*" element={<NotFound />} />

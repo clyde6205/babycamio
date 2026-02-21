@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check } from "lucide-react";
+import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown } from "lucide-react";
+import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@supabase/supabase-js";
 
@@ -26,6 +27,7 @@ const Dashboard = () => {
   const [newRoomName, setNewRoomName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { isPro } = useSubscription();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -109,9 +111,16 @@ const Dashboard = () => {
             Baby<span className="text-primary">Cam</span>.io
           </span>
         </div>
-        <Button variant="ghost" size="sm" onClick={handleLogout} className="touch-target">
-          <LogOut className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {!isPro && (
+            <Button variant="ghost" size="sm" onClick={() => navigate("/pricing")} className="touch-target text-yellow-500">
+              <Crown className="h-4 w-4 mr-1" /> Upgrade
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="touch-target">
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
       </header>
 
       <main className="mx-auto max-w-2xl px-5 py-6">

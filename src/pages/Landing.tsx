@@ -21,6 +21,14 @@ const Landing = () => {
             variant="ghost"
             size="sm"
             className="text-primary-foreground/80 hover:text-primary-foreground hover:bg-white/10 touch-target"
+            onClick={() => navigate("/pricing")}
+          >
+            Pricing
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-primary-foreground/80 hover:text-primary-foreground hover:bg-white/10 touch-target"
             onClick={() => navigate("/login")}
           >
             Log in
