@@ -85,7 +85,7 @@ const Pricing = () => {
           </Card>
 
           {/* Pro Plan */}
-          <Card className="relative overflow-hidden border-[hsl(var(--brand-blue))]/50 bg-gradient-to-b from-[hsl(var(--brand-blue))/15] to-white/5 p-6 text-primary-foreground backdrop-blur-sm ring-2 ring-[hsl(var(--brand-blue))]/30">
+          <Card className="relative overflow-hidden border-[hsl(var(--brand-blue))]/50 bg-white/5 p-6 text-primary-foreground backdrop-blur-sm ring-2 ring-[hsl(var(--brand-blue))]/30">
             <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[hsl(var(--brand-blue))]/20 blur-2xl" />
             <div className="absolute -top-1 right-4 rounded-b-lg bg-[hsl(var(--brand-blue))] px-3 py-1 text-xs font-bold text-white">
               {t("pricing.mostPopular")}
