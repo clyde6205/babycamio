@@ -60,9 +60,8 @@ const Landing = () => {
               className="w-full h-auto"
               width={1456}
               height={816}
-              loading="eager"
+              loading="lazy"
               decoding="async"
-              fetchPriority="high"
             />
           </div>
           <h1 className="mb-4 text-3xl font-extrabold leading-tight tracking-tight md:text-5xl lg:text-6xl">
