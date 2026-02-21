@@ -1,10 +1,13 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Shield, Video, Wifi, WifiOff, Volume2, Bell } from "lucide-react";
 import heroImage from "@/assets/babycam-hero.png";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const Landing = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen brand-gradient text-primary-foreground">
@@ -16,14 +19,15 @@ const Landing = () => {
             Baby<span className="text-[hsl(var(--brand-blue-light))]">Cam</span>.io
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <LanguageSwitcher variant="light" />
           <Button
             variant="ghost"
             size="sm"
             className="text-primary-foreground/80 hover:text-primary-foreground hover:bg-white/10 touch-target"
             onClick={() => navigate("/pricing")}
           >
-            Pricing
+            {t("landing.pricing")}
           </Button>
           <Button
             variant="ghost"
@@ -31,14 +35,14 @@ const Landing = () => {
             className="text-primary-foreground/80 hover:text-primary-foreground hover:bg-white/10 touch-target"
             onClick={() => navigate("/login")}
           >
-            Log in
+            {t("landing.login")}
           </Button>
           <Button
             size="sm"
             className="bg-[hsl(var(--brand-blue))] hover:bg-[hsl(var(--brand-blue-light))] text-white touch-target"
             onClick={() => navigate("/signup")}
           >
-            Get Started
+            {t("landing.getStarted")}
           </Button>
         </div>
       </header>
@@ -55,12 +59,10 @@ const Landing = () => {
             />
           </div>
           <h1 className="mb-4 text-3xl font-extrabold leading-tight tracking-tight md:text-5xl lg:text-6xl">
-            Professional <span className="text-brand-gradient">Baby Monitoring</span>
-            <br />Built for Every Connection
+            {t("landing.heroTitle")} <span className="text-brand-gradient">{t("landing.heroTitleSub")}</span>
           </h1>
           <p className="mb-8 max-w-xl text-base leading-relaxed text-primary-foreground/70 md:text-lg">
-            Enterprise-grade live video streaming that works on Wi-Fi, mobile data, or local networks. 
-            Optimized for Android devices worldwide — even on low bandwidth.
+            {t("landing.heroDesc")}
           </p>
           <div className="flex flex-wrap gap-3">
             <Button
@@ -68,7 +70,7 @@ const Landing = () => {
               className="bg-[hsl(var(--brand-blue))] hover:bg-[hsl(var(--brand-blue-light))] text-white text-base font-semibold px-8 touch-target"
               onClick={() => navigate("/signup")}
             >
-              Start Monitoring Free
+              {t("landing.startFree")}
             </Button>
             <Button
               size="lg"
@@ -76,7 +78,7 @@ const Landing = () => {
               className="border-white/20 text-primary-foreground hover:bg-white/10 text-base touch-target"
               onClick={() => navigate("/login")}
             >
-              Sign In
+              {t("landing.signIn")}
             </Button>
           </div>
         </div>
@@ -86,36 +88,12 @@ const Landing = () => {
       <section className="px-5 py-12 md:px-8 md:py-20">
         <div className="mx-auto grid max-w-5xl gap-4 md:grid-cols-3 md:gap-6">
           {[
-            {
-              icon: Wifi,
-              title: "Multi-Network",
-              desc: "Seamlessly switches between Wi-Fi, mobile data, and local connections. Works on 2G/3G/4G/5G.",
-            },
-            {
-              icon: WifiOff,
-              title: "Audio Fallback",
-              desc: "Automatically drops to audio-only on low bandwidth. Never lose connection to your baby.",
-            },
-            {
-              icon: Shield,
-              title: "End-to-End Secure",
-              desc: "Encrypted video rooms with token-based access. Only authorized viewers can connect.",
-            },
-            {
-              icon: Volume2,
-              title: "Two-Way Audio",
-              desc: "Talk back to soothe your baby. Crystal-clear audio optimized for low-end devices.",
-            },
-            {
-              icon: Bell,
-              title: "Smart Alerts",
-              desc: "Cry detection and motion alerts sent instantly to all connected devices.",
-            },
-            {
-              icon: Video,
-              title: "HD Streaming",
-              desc: "Adaptive bitrate streaming — HD when bandwidth allows, reliable when it doesn't.",
-            },
+            { icon: Wifi, title: t("landing.multiNetwork"), desc: t("landing.multiNetworkDesc") },
+            { icon: WifiOff, title: t("landing.audioFallback"), desc: t("landing.audioFallbackDesc") },
+            { icon: Shield, title: t("landing.e2eSecure"), desc: t("landing.e2eSecureDesc") },
+            { icon: Volume2, title: t("landing.twoWayAudio"), desc: t("landing.twoWayAudioDesc") },
+            { icon: Bell, title: t("landing.smartAlerts"), desc: t("landing.smartAlertsDesc") },
+            { icon: Video, title: t("landing.hdStreaming"), desc: t("landing.hdStreamingDesc") },
           ].map((f, i) => (
             <div
               key={i}
@@ -133,12 +111,10 @@ const Landing = () => {
       <section className="px-5 md:px-8">
         <div className="mx-auto max-w-5xl rounded-xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur-sm">
           <p className="text-xs text-primary-foreground/40 leading-relaxed">
-            <strong className="text-primary-foreground/60">Important:</strong> BabyCam.io is a monitoring tool and is not a substitute for 
-            in-person supervision of children. See our{" "}
+            <strong className="text-primary-foreground/60">Important:</strong> {t("landing.disclaimerBanner")}{" "}
             <button onClick={() => navigate("/disclaimer")} className="text-[hsl(var(--brand-blue-light))] underline">
-              full disclaimer
-            </button>{" "}
-            for details.
+              {t("landing.fullDisclaimer")}
+            </button>
           </p>
         </div>
       </section>
@@ -147,17 +123,17 @@ const Landing = () => {
       <footer className="border-t border-white/10 px-5 py-6 mt-12">
         <div className="mx-auto max-w-5xl flex flex-col items-center gap-4 md:flex-row md:justify-between">
           <p className="text-sm text-primary-foreground/40">
-            © {new Date().getFullYear()} BabyCam.io™ — All Rights Reserved.
+            {t("landing.copyright", { year: new Date().getFullYear() })}
           </p>
           <div className="flex gap-4">
             <button onClick={() => navigate("/terms")} className="text-xs text-primary-foreground/40 hover:text-primary-foreground/70 underline">
-              Terms of Service
+              {t("landing.terms")}
             </button>
             <button onClick={() => navigate("/privacy")} className="text-xs text-primary-foreground/40 hover:text-primary-foreground/70 underline">
-              Privacy Policy
+              {t("landing.privacy")}
             </button>
             <button onClick={() => navigate("/disclaimer")} className="text-xs text-primary-foreground/40 hover:text-primary-foreground/70 underline">
-              Disclaimer
+              {t("landing.disclaimer")}
             </button>
           </div>
         </div>

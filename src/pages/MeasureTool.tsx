@@ -1,17 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ArrowLeft, Video, Ruler, ArrowRightLeft } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Ruler, ArrowRightLeft } from "lucide-react";
 
 type Category = "length" | "weight" | "temperature" | "volume";
 
@@ -48,8 +43,16 @@ const UNITS: Record<Category, { name: string; toBase: (v: number) => number; fro
   ],
 };
 
+const CATEGORY_KEYS: Record<Category, string> = {
+  length: "measure.length",
+  weight: "measure.weight",
+  temperature: "measure.temperature",
+  volume: "measure.volume",
+};
+
 const MeasureTool = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [category, setCategory] = useState<Category>("length");
   const [fromUnit, setFromUnit] = useState("Inches");
   const [toUnit, setToUnit] = useState("Centimeters");
@@ -58,21 +61,16 @@ const MeasureTool = () => {
   const convert = (): string => {
     const val = parseFloat(inputValue);
     if (isNaN(val)) return "—";
-
     const units = UNITS[category];
     const from = units.find((u) => u.name === fromUnit);
     const to = units.find((u) => u.name === toUnit);
     if (!from || !to) return "—";
-
     const base = from.toBase(val);
     const result = to.fromBase(base);
     return result.toFixed(6).replace(/\.?0+$/, "");
   };
 
-  const swap = () => {
-    setFromUnit(toUnit);
-    setToUnit(fromUnit);
-  };
+  const swap = () => { setFromUnit(toUnit); setToUnit(fromUnit); };
 
   return (
     <div className="min-h-screen bg-background">
@@ -83,93 +81,59 @@ const MeasureTool = () => {
         <div className="flex items-center gap-2">
           <Ruler className="h-6 w-6 text-primary" />
           <span className="text-lg font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            Measure Tool
+            {t("measure.title")}
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-md px-5 py-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold mb-1">Unit Converter</h1>
-          <p className="text-sm text-muted-foreground">Convert between inches, centimeters, feet, and more.</p>
+          <h1 className="text-2xl font-bold mb-1">{t("measure.unitConverter")}</h1>
+          <p className="text-sm text-muted-foreground">{t("measure.desc")}</p>
         </div>
 
-        {/* Category selector */}
         <div className="flex gap-2 mb-6">
           {(["length", "weight", "temperature", "volume"] as Category[]).map((cat) => (
             <Button
               key={cat}
               variant={category === cat ? "default" : "outline"}
               size="sm"
-              onClick={() => {
-                setCategory(cat);
-                setFromUnit(UNITS[cat][0].name);
-                setToUnit(UNITS[cat][1].name);
-                setInputValue("");
-              }}
+              onClick={() => { setCategory(cat); setFromUnit(UNITS[cat][0].name); setToUnit(UNITS[cat][1].name); setInputValue(""); }}
               className="capitalize touch-target flex-1"
             >
-              {cat}
+              {t(CATEGORY_KEYS[cat])}
             </Button>
           ))}
         </div>
 
         <Card className="p-5 space-y-4">
-          {/* From */}
           <div className="space-y-2">
-            <Label>From</Label>
+            <Label>{t("measure.from")}</Label>
             <div className="flex gap-2">
-              <Input
-                type="number"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Enter value"
-                className="flex-1 text-lg font-mono"
-              />
+              <Input type="number" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={t("measure.enterValue")} className="flex-1 text-lg font-mono" />
               <Select value={fromUnit} onValueChange={setFromUnit}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNITS[category].map((u) => (
-                    <SelectItem key={u.name} value={u.name}>{u.name}</SelectItem>
-                  ))}
-                </SelectContent>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>{UNITS[category].map((u) => (<SelectItem key={u.name} value={u.name}>{u.name}</SelectItem>))}</SelectContent>
               </Select>
             </div>
           </div>
-
-          {/* Swap button */}
           <div className="flex justify-center">
-            <Button variant="ghost" size="icon" onClick={swap} className="rounded-full">
-              <ArrowRightLeft className="h-4 w-4" />
-            </Button>
+            <Button variant="ghost" size="icon" onClick={swap} className="rounded-full"><ArrowRightLeft className="h-4 w-4" /></Button>
           </div>
-
-          {/* To */}
           <div className="space-y-2">
-            <Label>To</Label>
+            <Label>{t("measure.to")}</Label>
             <div className="flex gap-2">
-              <div className="flex-1 flex items-center rounded-md border bg-muted/50 px-3 text-lg font-mono min-h-[40px]">
-                {convert()}
-              </div>
+              <div className="flex-1 flex items-center rounded-md border bg-muted/50 px-3 text-lg font-mono min-h-[40px]">{convert()}</div>
               <Select value={toUnit} onValueChange={setToUnit}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNITS[category].map((u) => (
-                    <SelectItem key={u.name} value={u.name}>{u.name}</SelectItem>
-                  ))}
-                </SelectContent>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>{UNITS[category].map((u) => (<SelectItem key={u.name} value={u.name}>{u.name}</SelectItem>))}</SelectContent>
               </Select>
             </div>
           </div>
         </Card>
 
-        {/* Quick reference */}
         <Card className="mt-4 p-4 bg-muted/30">
-          <h3 className="text-sm font-semibold mb-2">Quick Reference</h3>
+          <h3 className="text-sm font-semibold mb-2">{t("measure.quickRef")}</h3>
           <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
             <span>1 inch = 2.54 cm</span>
             <span>1 foot = 30.48 cm</span>
@@ -182,7 +146,7 @@ const MeasureTool = () => {
       </main>
 
       <footer className="border-t px-5 py-4 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} BabyCam.io™ — All Rights Reserved.
+        {t("common.copyright", { year: new Date().getFullYear() })}
       </footer>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, 
 import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
 import ShareDialog from "@/components/ShareDialog";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import type { User } from "@supabase/supabase-js";
 
 interface Room {
@@ -20,6 +22,7 @@ interface Room {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -40,7 +43,6 @@ const Dashboard = () => {
       }
       setUser(session.user);
 
-      // Check admin role
       const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
@@ -81,12 +83,12 @@ const Dashboard = () => {
     });
 
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else {
       setNewRoomName("");
       setShowCreate(false);
       await fetchRooms();
-      toast({ title: "Room created", description: `"${newRoomName}" is ready to use.` });
+      toast({ title: t("dashboard.roomCreated"), description: `"${newRoomName}" is ready to use.` });
     }
     setCreating(false);
   };
@@ -95,7 +97,7 @@ const Dashboard = () => {
     const { error } = await supabase.from("rooms").delete().eq("id", id);
     if (!error) {
       setRooms((prev) => prev.filter((r) => r.id !== id));
-      toast({ title: "Room deleted" });
+      toast({ title: t("dashboard.roomDeleted") });
     }
   };
 
@@ -103,7 +105,7 @@ const Dashboard = () => {
     navigator.clipboard.writeText(roomName);
     setCopiedId(roomName);
     setTimeout(() => setCopiedId(null), 2000);
-    toast({ title: "Room code copied", description: "Share this with viewers." });
+    toast({ title: t("dashboard.roomCodeCopied"), description: t("dashboard.shareWithViewers") });
   };
 
   const handleLogout = async () => {
@@ -113,7 +115,6 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Top bar */}
       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-5 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <Video className="h-6 w-6 text-primary" />
@@ -122,9 +123,10 @@ const Dashboard = () => {
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <LanguageSwitcher />
           {!isPro && (
             <Button variant="ghost" size="sm" onClick={() => navigate("/pricing")} className="touch-target text-yellow-500">
-              <Crown className="h-4 w-4 mr-1" /> Upgrade
+              <Crown className="h-4 w-4 mr-1" /> {t("dashboard.upgrade")}
             </Button>
           )}
           {isAdmin && (
@@ -132,7 +134,7 @@ const Dashboard = () => {
               <Shield className="h-4 w-4" />
             </Button>
           )}
-          <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="touch-target" title="Settings">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="touch-target" title={t("settings.title")}>
             <Settings className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={handleLogout} className="touch-target">
@@ -144,37 +146,31 @@ const Dashboard = () => {
       <main className="mx-auto max-w-2xl px-5 py-6">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">My Rooms</h1>
-            <p className="text-sm text-muted-foreground">Manage your monitoring cameras</p>
+            <h1 className="text-2xl font-bold">{t("dashboard.myRooms")}</h1>
+            <p className="text-sm text-muted-foreground">{t("dashboard.manageRooms")}</p>
           </div>
-          <Button
-            size="sm"
-            onClick={() => setShowCreate(!showCreate)}
-            className="touch-target"
-          >
-            <Plus className="mr-1 h-4 w-4" /> New Room
+          <Button size="sm" onClick={() => setShowCreate(!showCreate)} className="touch-target">
+            <Plus className="mr-1 h-4 w-4" /> {t("dashboard.newRoom")}
           </Button>
         </div>
 
-        {/* Create room form */}
         {showCreate && (
           <Card className="mb-6 p-4">
             <div className="flex gap-2">
               <Input
                 value={newRoomName}
                 onChange={(e) => setNewRoomName(e.target.value)}
-                placeholder="Room name (e.g. Nursery)"
+                placeholder={t("dashboard.roomPlaceholder")}
                 className="touch-target"
                 onKeyDown={(e) => e.key === "Enter" && createRoom()}
               />
               <Button onClick={createRoom} disabled={creating} className="touch-target">
-                {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create"}
+                {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : t("dashboard.create")}
               </Button>
             </div>
           </Card>
         )}
 
-        {/* Room list */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -182,10 +178,10 @@ const Dashboard = () => {
         ) : rooms.length === 0 ? (
           <div className="rounded-xl border-2 border-dashed p-12 text-center">
             <Video className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
-            <h3 className="mb-1 text-lg font-semibold">No rooms yet</h3>
-            <p className="mb-4 text-sm text-muted-foreground">Create your first room to start monitoring</p>
+            <h3 className="mb-1 text-lg font-semibold">{t("dashboard.noRoomsTitle")}</h3>
+            <p className="mb-4 text-sm text-muted-foreground">{t("dashboard.noRoomsDesc")}</p>
             <Button onClick={() => setShowCreate(true)} className="touch-target">
-              <Plus className="mr-1 h-4 w-4" /> Create Room
+              <Plus className="mr-1 h-4 w-4" /> {t("dashboard.createRoom")}
             </Button>
           </div>
         ) : (
@@ -198,84 +194,56 @@ const Dashboard = () => {
                       {room.room_name.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")}
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      {room.is_active ? "🟢 Live" : "⚫ Offline"} · {room.room_type}
+                      {room.is_active ? `🟢 ${t("dashboard.live")}` : `⚫ ${t("dashboard.offline")}`} · {room.room_type}
                     </p>
                   </div>
                   <div className="flex gap-1">
                     {user && (
                       <ShareDialog roomId={room.id} roomName={room.room_name} userId={user.id} />
                     )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => copyRoomCode(room.room_name)}
-                    >
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyRoomCode(room.room_name)}>
                       {copiedId === room.room_name ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => deleteRoom(room.id)}
-                    >
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteRoom(room.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    className="flex-1 touch-target"
-                    onClick={() => navigate(`/camera/${room.room_name}`)}
-                  >
-                    <Camera className="mr-1 h-4 w-4" /> Start Camera
+                  <Button size="sm" className="flex-1 touch-target" onClick={() => navigate(`/camera/${room.room_name}`)}>
+                    <Camera className="mr-1 h-4 w-4" /> {t("dashboard.startCamera")}
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="flex-1 touch-target"
-                    onClick={() => navigate(`/viewer/${room.room_name}`)}
-                  >
-                    <Eye className="mr-1 h-4 w-4" /> Watch
+                  <Button size="sm" variant="secondary" className="flex-1 touch-target" onClick={() => navigate(`/viewer/${room.room_name}`)}>
+                    <Eye className="mr-1 h-4 w-4" /> {t("dashboard.watch")}
                   </Button>
                 </div>
               </Card>
             ))}
           </div>
         )}
-        {/* Handy Tools */}
+
         <div className="mt-8 mb-4">
-          <h2 className="text-lg font-bold mb-1">Handy Tools</h2>
-          <p className="text-xs text-muted-foreground">Useful utilities for parents & handymen</p>
+          <h2 className="text-lg font-bold mb-1">{t("dashboard.handyTools")}</h2>
+          <p className="text-xs text-muted-foreground">{t("dashboard.handyToolsDesc")}</p>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <Card
-            className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors"
-            onClick={() => navigate("/tools/measure")}
-          >
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/tools/measure")}>
             <Ruler className="h-6 w-6 text-primary" />
-            <span className="text-xs font-medium text-center">Measure</span>
+            <span className="text-xs font-medium text-center">{t("dashboard.measure")}</span>
           </Card>
-          <Card
-            className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors"
-            onClick={() => navigate("/tools/level")}
-          >
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/tools/level")}>
             <Crosshair className="h-6 w-6 text-primary" />
-            <span className="text-xs font-medium text-center">Level</span>
+            <span className="text-xs font-medium text-center">{t("dashboard.level")}</span>
           </Card>
-          <Card
-            className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors"
-            onClick={() => navigate("/ai")}
-          >
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/ai")}>
             <Bot className="h-6 w-6 text-primary" />
-            <span className="text-xs font-medium text-center">AI Assistant</span>
+            <span className="text-xs font-medium text-center">{t("dashboard.aiAssistant")}</span>
           </Card>
         </div>
       </main>
 
       <footer className="border-t px-5 py-4 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} BabyCam.io™ — All Rights Reserved.
+        {t("common.copyright", { year: new Date().getFullYear() })}
       </footer>
     </div>
   );
