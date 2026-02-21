@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield } from "lucide-react";
+import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield, Ruler, Crosshair, Bot } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
 import ShareDialog from "@/components/ShareDialog";
@@ -244,6 +244,34 @@ const Dashboard = () => {
             ))}
           </div>
         )}
+        {/* Handy Tools */}
+        <div className="mt-8 mb-4">
+          <h2 className="text-lg font-bold mb-1">Handy Tools</h2>
+          <p className="text-xs text-muted-foreground">Useful utilities for parents & handymen</p>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <Card
+            className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={() => navigate("/tools/measure")}
+          >
+            <Ruler className="h-6 w-6 text-primary" />
+            <span className="text-xs font-medium text-center">Measure</span>
+          </Card>
+          <Card
+            className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={() => navigate("/tools/level")}
+          >
+            <Crosshair className="h-6 w-6 text-primary" />
+            <span className="text-xs font-medium text-center">Level</span>
+          </Card>
+          <Card
+            className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={() => navigate("/ai")}
+          >
+            <Bot className="h-6 w-6 text-primary" />
+            <span className="text-xs font-medium text-center">AI Assistant</span>
+          </Card>
+        </div>
       </main>
 
       <footer className="border-t px-5 py-4 text-center text-xs text-muted-foreground">
