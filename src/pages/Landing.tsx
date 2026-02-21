@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Shield, Video, Wifi, WifiOff, Volume2, Bell } from "lucide-react";
-import heroImage from "@/assets/babycam-hero.png";
+import heroImage from "@/assets/babycam-hero.webp";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const Landing = () => {
@@ -55,7 +55,11 @@ const Landing = () => {
               src={heroImage}
               alt="BabyCam.io Professional Monitoring Solutions — baby monitoring, home security, and vehicle surveillance"
               className="w-full h-auto"
+              width={1456}
+              height={816}
               loading="eager"
+              decoding="async"
+              fetchPriority="high"
             />
           </div>
           <h1 className="mb-4 text-3xl font-extrabold leading-tight tracking-tight md:text-5xl lg:text-6xl">
