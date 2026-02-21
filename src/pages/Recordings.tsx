@@ -6,7 +6,8 @@ import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { useSubscription } from "@/hooks/use-subscription";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Trash2, Play, Loader2, Film, HardDrive, Crown } from "lucide-react";
+import { ArrowLeft, Trash2, Play, Loader2, Film, HardDrive, Crown, Share2 } from "lucide-react";
+import ShareRecordingDialog from "@/components/ShareRecordingDialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface Recording {
@@ -186,6 +187,11 @@ const Recordings = () => {
                     >
                       <Play className="h-4 w-4" />
                     </Button>
+                    <ShareRecordingDialog
+                      recordingId={rec.id}
+                      recordingName={roomLabel}
+                      filePath={rec.file_path}
+                    />
                     <Button
                       size="icon"
                       variant="outline"
