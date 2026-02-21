@@ -5,11 +5,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Video, VideoOff, Mic, MicOff, Wifi, WifiOff, Loader2, RefreshCw,
-  Signal, SignalLow, SignalMedium, SignalHigh, Volume2,
+  Signal, SignalLow, SignalMedium, SignalHigh, Volume2, Activity,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
-import { ConnectionState, Track } from "livekit-client";
+import { useMotionDetection } from "@/hooks/use-motion-detection";
+import { ConnectionState, Track, DataPacket_Kind } from "livekit-client";
 
 const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
   switch (quality) {
@@ -54,6 +55,21 @@ const CameraView = () => {
   const { room, connectionState, networkQuality, isConnecting, error, connect, disconnect, retry, audioOnly } = useLiveKit({
     roomName: roomName || "", participantName: displayName, isPublisher: true,
   });
+
+  // Motion detection — runs on the local video element
+  const { isMotionDetected, motionLevel, enabled: motionEnabled, setEnabled: setMotionEnabled } = useMotionDetection(
+    videoRef.current,
+    { threshold: 25, minMotionPercent: 1.5, cooldown: 3000 }
+  );
+
+  // Send motion event to all viewers via LiveKit data channel
+  useEffect(() => {
+    if (!isMotionDetected || !room || connectionState !== ConnectionState.Connected) return;
+    const payload = JSON.stringify({ type: "motion", level: motionLevel, ts: Date.now() });
+    const encoder = new TextEncoder();
+    room.localParticipant.publishData(encoder.encode(payload), { reliable: true });
+    console.log("[Motion] Detected! Level:", motionLevel);
+  }, [isMotionDetected, room, connectionState, motionLevel]);
 
   useEffect(() => {
     if (!room || connectionState !== ConnectionState.Connected) return;
@@ -120,11 +136,20 @@ const CameraView = () => {
         </button>
         <div className="flex items-center gap-3">
           {isConnected && (
-            <div className="flex items-center gap-1.5 rounded-full bg-red-600/90 px-3 py-1">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
-              <span className="text-xs font-bold">LIVE</span>
-              <span className="text-xs tabular-nums">{formatTime(elapsedTime)}</span>
-            </div>
+            <>
+              <div className="flex items-center gap-1.5 rounded-full bg-red-600/90 px-3 py-1">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                <span className="text-xs font-bold">LIVE</span>
+                <span className="text-xs tabular-nums">{formatTime(elapsedTime)}</span>
+              </div>
+              {/* Motion indicator */}
+              {motionEnabled && isMotionDetected && (
+                <div className="flex items-center gap-1.5 rounded-full bg-orange-500/90 px-3 py-1 animate-pulse">
+                  <Activity className="h-3 w-3" />
+                  <span className="text-xs font-bold">MOTION</span>
+                </div>
+              )}
+            </>
           )}
           {isReconnecting && (
             <div className="flex items-center gap-1.5 rounded-full bg-yellow-600/90 px-3 py-1">
@@ -141,6 +166,20 @@ const CameraView = () => {
 
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
         <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
+
+        {/* Motion level bar overlay */}
+        {isConnected && motionEnabled && (
+          <div className="absolute top-2 left-2 right-2 z-10">
+            <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  isMotionDetected ? "bg-orange-500" : "bg-green-500/60"
+                }`}
+                style={{ width: `${Math.min(motionLevel * 5, 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {audioOnly && isConnected && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
@@ -178,7 +217,7 @@ const CameraView = () => {
 
       {isConnected && (
         <div className="safe-bottom bg-gradient-to-t from-black/90 to-transparent px-6 pb-4 pt-6">
-          <div className="flex items-center justify-center gap-8">
+          <div className="flex items-center justify-center gap-6">
             <button onClick={toggleVideo} className="touch-target flex flex-col items-center gap-1.5">
               <div className={`flex h-12 w-12 items-center justify-center rounded-full ${videoEnabled ? "bg-white/15" : "bg-red-500/80"}`}>
                 {videoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
@@ -190,6 +229,13 @@ const CameraView = () => {
                 {audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
               </div>
               <span className="text-[10px] opacity-60">{audioEnabled ? t("camera.mic") : t("camera.muted")}</span>
+            </button>
+            {/* Motion toggle */}
+            <button onClick={() => setMotionEnabled(!motionEnabled)} className="touch-target flex flex-col items-center gap-1.5">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${motionEnabled ? "bg-orange-500/80" : "bg-white/15"}`}>
+                <Activity className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] opacity-60">{motionEnabled ? "Motion" : "No Motion"}</span>
             </button>
             <button onClick={handleDisconnect} className="touch-target flex flex-col items-center gap-1.5">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-600/30">
