@@ -26,6 +26,10 @@ const Recordings = lazy(() => import("./pages/Recordings"));
 const SleepAnalytics = lazy(() => import("./pages/SleepAnalytics"));
 const FamilyCircle = lazy(() => import("./pages/FamilyCircle"));
 const ReferralPage = lazy(() => import("./pages/ReferralPage"));
+const BabyCareLog = lazy(() => import("./pages/BabyCareLog"));
+const Milestones = lazy(() => import("./pages/Milestones"));
+const CaregiverMode = lazy(() => import("./pages/CaregiverMode"));
+const InstallApp = lazy(() => import("./pages/InstallApp"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -90,6 +94,10 @@ const App = () => {
               <Route path="/sleep" element={<SafePage scope="Sleep"><SleepAnalytics /></SafePage>} />
               <Route path="/family" element={<SafePage scope="Family"><FamilyCircle /></SafePage>} />
               <Route path="/referral" element={<SafePage scope="Referral"><ReferralPage /></SafePage>} />
+              <Route path="/care-log" element={<SafePage scope="CareLog"><BabyCareLog /></SafePage>} />
+              <Route path="/milestones" element={<SafePage scope="Milestones"><Milestones /></SafePage>} />
+              <Route path="/caregiver" element={<SafePage scope="Caregiver"><CaregiverMode /></SafePage>} />
+              <Route path="/install" element={<SafePage scope="Install"><InstallApp /></SafePage>} />
               <Route path="/camera/:roomName" element={<SafePage scope="Camera"><CameraView /></SafePage>} />
               <Route path="/viewer/:roomName" element={<SafePage scope="Viewer"><ViewerView /></SafePage>} />
               <Route path="*" element={<NotFound />} />

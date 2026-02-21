@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Moon, Sun, Activity, Baby, TrendingUp, Loader2, Calendar } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid } from "recharts";
+import SleepSummary from "@/components/SleepSummary";
 
 interface SleepEvent {
   id: string;
@@ -103,6 +104,9 @@ const SleepAnalytics = () => {
         <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="p-4 space-y-4">
+          {/* Daily Sleep Summary */}
+          <SleepSummary events={events} dateLabel={`Last ${selectedDays} days`} />
+
           {/* Stats Cards */}
           <div className="grid grid-cols-2 gap-3">
             <Card className="p-4 text-center">

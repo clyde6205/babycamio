@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield, Ruler, Crosshair, Bot, Film, Moon, Heart, Gift, BatteryCharging, Users } from "lucide-react";
+import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield, Ruler, Crosshair, Bot, Film, Moon, Heart, Gift, BatteryCharging, Users, Baby, Star, UserPlus } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
@@ -218,6 +218,18 @@ const Dashboard = () => {
             <Moon className="h-6 w-6 text-indigo-400" />
             <span className="text-xs font-medium text-center">Sleep</span>
           </Card>
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/care-log")}>
+            <Baby className="h-6 w-6 text-blue-400" />
+            <span className="text-xs font-medium text-center">Care Log</span>
+          </Card>
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/milestones")}>
+            <Star className="h-6 w-6 text-yellow-400" />
+            <span className="text-xs font-medium text-center">Milestones</span>
+          </Card>
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/caregiver")}>
+            <UserPlus className="h-6 w-6 text-purple-400" />
+            <span className="text-xs font-medium text-center">Caregiver</span>
+          </Card>
           <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/family")}>
             <Heart className="h-6 w-6 text-red-400" />
             <span className="text-xs font-medium text-center">Family</span>
@@ -226,6 +238,10 @@ const Dashboard = () => {
             <Gift className="h-6 w-6 text-yellow-400" />
             <span className="text-xs font-medium text-center">Refer</span>
           </Card>
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/ai")}>
+            <Bot className="h-6 w-6 text-primary" />
+            <span className="text-xs font-medium text-center">{t("dashboard.aiAssistant")}</span>
+          </Card>
           <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/tools/measure")}>
             <Ruler className="h-6 w-6 text-primary" />
             <span className="text-xs font-medium text-center">{t("dashboard.measure")}</span>
@@ -233,10 +249,6 @@ const Dashboard = () => {
           <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/tools/level")}>
             <Crosshair className="h-6 w-6 text-primary" />
             <span className="text-xs font-medium text-center">{t("dashboard.level")}</span>
-          </Card>
-          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/ai")}>
-            <Bot className="h-6 w-6 text-primary" />
-            <span className="text-xs font-medium text-center">{t("dashboard.aiAssistant")}</span>
           </Card>
           <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/settings")}>
             <BatteryCharging className="h-6 w-6 text-green-400" />
