@@ -1,4 +1,4 @@
-import { Video } from "lucide-react";
+import { Video, Mail, Facebook } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface CopyrightFooterProps {
@@ -29,6 +29,15 @@ const CopyrightFooter = ({ variant = "dark", showLinks = true }: CopyrightFooter
         <p className={`text-[11px] ${textClass}`}>
           © {year} BabyCam.io™ — All Rights Reserved. Patent Pending.
         </p>
+        <div className={`flex flex-wrap justify-center gap-3 text-[11px] ${textClass}`}>
+          <a href="mailto:contact@BabyCam.io" className={`flex items-center gap-1 ${linkClass}`}>
+            <Mail className="h-3 w-3" /> contact@BabyCam.io
+          </a>
+          <span className="opacity-30">·</span>
+          <a href="https://facebook.com/themoonclyde" target="_blank" rel="noopener noreferrer" className={`flex items-center gap-1 ${linkClass}`}>
+            <Facebook className="h-3 w-3" /> themoonclyde
+          </a>
+        </div>
         {showLinks && (
           <div className="flex gap-4">
             <button onClick={() => navigate("/terms")} className={`text-[11px] ${linkClass}`}>
