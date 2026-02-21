@@ -10,6 +10,7 @@ import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
 import ShareDialog from "@/components/ShareDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import AdBanner from "@/components/AdBanner";
 import type { User } from "@supabase/supabase-js";
 
 interface Room {
@@ -241,6 +242,8 @@ const Dashboard = () => {
           </Card>
         </div>
       </main>
+
+      <AdBanner />
 
       <footer className="border-t px-5 py-4 text-center text-xs text-muted-foreground">
         {t("common.copyright", { year: new Date().getFullYear() })}

@@ -17,6 +17,7 @@ const Pricing = () => {
   const [user, setUser] = useState<any>(null);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
 
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setUser(data.user)); }, []);
 
@@ -25,7 +26,7 @@ const Pricing = () => {
     setSelectedProvider(provider);
     setProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("create-checkout", { body: { provider, plan: "pro" } });
+      const { data, error } = await supabase.functions.invoke("create-checkout", { body: { provider, plan: "pro", billing: billingCycle } });
       if (error) throw error;
       if (data?.url) window.location.href = data.url;
       else if (data?.message) toast({ title: "Info", description: data.message });
@@ -94,10 +95,35 @@ const Pricing = () => {
                 <Crown className="h-5 w-5 text-yellow-400" />
                 <h2 className="text-xl font-bold">{t("pricing.pro")}</h2>
               </div>
-              <p className="text-sm text-primary-foreground/50">{t("pricing.enterprise")}</p>
-              <div className="mt-4">
-                <span className="text-4xl font-extrabold">$9.97</span>
-                <span className="text-primary-foreground/50">{t("pricing.month")}</span>
+              <p className="text-sm text-primary-foreground/50">{t("pricing.noAdsEver")}</p>
+              <div className="mt-4 flex items-baseline gap-1">
+                {billingCycle === "monthly" ? (
+                  <>
+                    <span className="text-4xl font-extrabold">$9.97</span>
+                    <span className="text-primary-foreground/50">{t("pricing.month")}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-4xl font-extrabold">$89</span>
+                    <span className="text-primary-foreground/50">{t("pricing.year")}</span>
+                    <span className="ml-2 rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-bold text-green-400">{t("pricing.save26")}</span>
+                  </>
+                )}
+              </div>
+              {/* Billing toggle */}
+              <div className="mt-3 flex rounded-lg bg-white/10 p-1">
+                <button
+                  onClick={() => setBillingCycle("monthly")}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${billingCycle === "monthly" ? "bg-white/20 text-white" : "text-primary-foreground/50"}`}
+                >
+                  {t("pricing.monthly")}
+                </button>
+                <button
+                  onClick={() => setBillingCycle("annual")}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${billingCycle === "annual" ? "bg-white/20 text-white" : "text-primary-foreground/50"}`}
+                >
+                  {t("pricing.annual")} 🎉
+                </button>
               </div>
             </div>
             <ul className="mb-8 space-y-3">
