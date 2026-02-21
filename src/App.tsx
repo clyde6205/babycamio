@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { RTL_LANGUAGES } from "@/i18n";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Lazy-load all pages for smaller initial bundle on low-end devices
 const Landing = lazy(() => import("./pages/Landing"));
@@ -30,10 +31,12 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Reduce refetching on low-end devices
       staleTime: 5 * 60 * 1000,
       gcTime: 10 * 60 * 1000,
       refetchOnWindowFocus: false,
+      retry: 2,
+    },
+    mutations: {
       retry: 1,
     },
   },
@@ -44,6 +47,11 @@ const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen bg-background">
     <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
   </div>
+);
+
+/** Wrap a lazy page with its own error boundary so one page crash doesn't kill the app */
+const SafePage = ({ children, scope }: { children: React.ReactNode; scope: string }) => (
+  <ErrorBoundary scope={scope}>{children}</ErrorBoundary>
 );
 
 const App = () => {
@@ -57,38 +65,40 @@ const App = () => {
   }, [i18n.language]);
 
   return (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Dashboard />} />
-            <Route path="/signup" element={<Dashboard />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/admin" element={<AdminConsole />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/disclaimer" element={<Disclaimer />} />
-            <Route path="/tools/measure" element={<MeasureTool />} />
-            <Route path="/tools/level" element={<LevelTool />} />
-            <Route path="/ai" element={<AIAssistant />} />
-            <Route path="/recordings" element={<Recordings />} />
-            <Route path="/sleep" element={<SleepAnalytics />} />
-            <Route path="/family" element={<FamilyCircle />} />
-            <Route path="/referral" element={<ReferralPage />} />
-            <Route path="/camera/:roomName" element={<CameraView />} />
-            <Route path="/viewer/:roomName" element={<ViewerView />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary scope="App">
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<SafePage scope="Landing"><Landing /></SafePage>} />
+              <Route path="/login" element={<SafePage scope="Auth"><Dashboard /></SafePage>} />
+              <Route path="/signup" element={<SafePage scope="Auth"><Dashboard /></SafePage>} />
+              <Route path="/dashboard" element={<SafePage scope="Dashboard"><Dashboard /></SafePage>} />
+              <Route path="/pricing" element={<SafePage scope="Pricing"><Pricing /></SafePage>} />
+              <Route path="/settings" element={<SafePage scope="Settings"><Settings /></SafePage>} />
+              <Route path="/admin" element={<SafePage scope="Admin"><AdminConsole /></SafePage>} />
+              <Route path="/terms" element={<SafePage scope="Terms"><Terms /></SafePage>} />
+              <Route path="/privacy" element={<SafePage scope="Privacy"><Privacy /></SafePage>} />
+              <Route path="/disclaimer" element={<SafePage scope="Disclaimer"><Disclaimer /></SafePage>} />
+              <Route path="/tools/measure" element={<SafePage scope="Measure"><MeasureTool /></SafePage>} />
+              <Route path="/tools/level" element={<SafePage scope="Level"><LevelTool /></SafePage>} />
+              <Route path="/ai" element={<SafePage scope="AI"><AIAssistant /></SafePage>} />
+              <Route path="/recordings" element={<SafePage scope="Recordings"><Recordings /></SafePage>} />
+              <Route path="/sleep" element={<SafePage scope="Sleep"><SleepAnalytics /></SafePage>} />
+              <Route path="/family" element={<SafePage scope="Family"><FamilyCircle /></SafePage>} />
+              <Route path="/referral" element={<SafePage scope="Referral"><ReferralPage /></SafePage>} />
+              <Route path="/camera/:roomName" element={<SafePage scope="Camera"><CameraView /></SafePage>} />
+              <Route path="/viewer/:roomName" element={<SafePage scope="Viewer"><ViewerView /></SafePage>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
   );
 };
 
