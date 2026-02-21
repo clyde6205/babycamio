@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Video, Check, ArrowLeft, Crown, Zap, Globe, Shield, Headphones } from "lucide-react";
+import { Video, Check, ArrowLeft, Crown, Zap, Globe, Shield, Headphones, Coins } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
@@ -26,7 +26,13 @@ const Pricing = () => {
     setSelectedProvider(provider);
     setProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("create-checkout", { body: { provider, plan: "pro", billing: billingCycle } });
+      // BitPay/XRP uses a separate edge function
+      const functionName = provider === "bitpay" ? "create-bitpay-checkout" : "create-checkout";
+      const body = provider === "bitpay"
+        ? { plan: "pro", billing: billingCycle }
+        : { provider, plan: "pro", billing: billingCycle };
+
+      const { data, error } = await supabase.functions.invoke(functionName, { body });
       if (error) throw error;
       if (data?.url) window.location.href = data.url;
       else if (data?.message) toast({ title: "Info", description: data.message });
@@ -144,11 +150,27 @@ const Pricing = () => {
                 {[
                   { id: "stripe", nameKey: "pricing.creditDebit", icon: "💳", regionKey: "pricing.global" },
                   { id: "paypal", nameKey: "pricing.paypal", icon: "🅿️", regionKey: "pricing.global" },
+                  { id: "bitpay", nameKey: "Pay with XRP", icon: "⚡", regionKey: "pricing.global", highlight: true },
                   { id: "paymongo", nameKey: "pricing.gcashMaya", icon: "🇵🇭", regionKey: "pricing.philippines" },
                   { id: "mpesa", nameKey: "pricing.mpesa", icon: "🇰🇪", regionKey: "pricing.africaRegions" },
                 ].map((p) => (
-                  <Button key={p.id} className="w-full justify-between bg-white/10 hover:bg-white/20 text-primary-foreground font-medium touch-target" onClick={() => handleSubscribe(p.id)} disabled={processing}>
-                    <span className="flex items-center gap-2"><span className="text-lg">{p.icon}</span>{t(p.nameKey)}</span>
+                  <Button
+                    key={p.id}
+                    className={`w-full justify-between font-medium touch-target ${
+                      p.highlight
+                        ? "bg-gradient-to-r from-blue-600/30 to-indigo-600/30 hover:from-blue-600/40 hover:to-indigo-600/40 text-primary-foreground ring-1 ring-blue-400/30"
+                        : "bg-white/10 hover:bg-white/20 text-primary-foreground"
+                    }`}
+                    onClick={() => handleSubscribe(p.id)}
+                    disabled={processing}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-lg">{p.icon}</span>
+                      {p.nameKey.startsWith("pricing.") ? t(p.nameKey) : p.nameKey}
+                      {p.highlight && (
+                        <span className="rounded-full bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-bold text-blue-300 uppercase">Fast</span>
+                      )}
+                    </span>
                     <span className="text-xs text-primary-foreground/40">{t(p.regionKey)}</span>
                   </Button>
                 ))}
