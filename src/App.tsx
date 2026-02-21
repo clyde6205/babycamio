@@ -10,6 +10,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Lazy-load all pages for smaller initial bundle on low-end devices
 const Landing = lazy(() => import("./pages/Landing"));
+const Auth = lazy(() => import("./pages/Auth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const CameraView = lazy(() => import("./pages/CameraView"));
 const ViewerView = lazy(() => import("./pages/ViewerView"));
@@ -78,8 +79,8 @@ const App = () => {
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<SafePage scope="Landing"><Landing /></SafePage>} />
-              <Route path="/login" element={<SafePage scope="Auth"><Dashboard /></SafePage>} />
-              <Route path="/signup" element={<SafePage scope="Auth"><Dashboard /></SafePage>} />
+              <Route path="/login" element={<SafePage scope="Auth"><Auth mode="login" /></SafePage>} />
+              <Route path="/signup" element={<SafePage scope="Auth"><Auth mode="signup" /></SafePage>} />
               <Route path="/dashboard" element={<SafePage scope="Dashboard"><Dashboard /></SafePage>} />
               <Route path="/pricing" element={<SafePage scope="Pricing"><Pricing /></SafePage>} />
               <Route path="/settings" element={<SafePage scope="Settings"><Settings /></SafePage>} />
