@@ -5,10 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Eye, Volume2, VolumeX, Loader2, RefreshCw, Maximize2, Minimize2,
-  SignalHigh, SignalMedium, SignalLow, WifiOff,
+  SignalHigh, SignalMedium, SignalLow, WifiOff, Activity,
 } from "lucide-react";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
-import { ConnectionState, RoomEvent, Track, RemoteTrackPublication, RemoteParticipant } from "livekit-client";
+import { ConnectionState, RoomEvent, Track } from "livekit-client";
 
 const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
   switch (quality) {
@@ -33,6 +33,11 @@ const ViewerView = () => {
   const [displayName, setDisplayName] = useState("Viewer");
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Motion alert state
+  const [motionAlert, setMotionAlert] = useState(false);
+  const [motionLevel, setMotionLevel] = useState(0);
+  const motionTimeoutRef = useRef<number | null>(null);
+
   useEffect(() => {
     const getProfile = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -46,6 +51,29 @@ const ViewerView = () => {
   const { room, connectionState, networkQuality, isConnecting, error, connect, disconnect, retry, audioOnly } = useLiveKit({
     roomName: roomName || "", participantName: displayName, isPublisher: false,
   });
+
+  // Listen for motion data messages from the camera
+  useEffect(() => {
+    if (!room) return;
+
+    const handleData = (payload: Uint8Array) => {
+      try {
+        const msg = JSON.parse(new TextDecoder().decode(payload));
+        if (msg.type === "motion") {
+          setMotionAlert(true);
+          setMotionLevel(msg.level || 0);
+          // Vibrate if supported
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+          // Clear after 4 seconds
+          if (motionTimeoutRef.current) clearTimeout(motionTimeoutRef.current);
+          motionTimeoutRef.current = window.setTimeout(() => setMotionAlert(false), 4000);
+        }
+      } catch { /* ignore non-json */ }
+    };
+
+    room.on(RoomEvent.DataReceived, handleData);
+    return () => { room.off(RoomEvent.DataReceived, handleData); };
+  }, [room]);
 
   // Handle remote tracks
   useEffect(() => {
@@ -83,6 +111,24 @@ const ViewerView = () => {
 
   return (
     <div ref={containerRef} className="flex min-h-[100dvh] flex-col bg-black text-white select-none">
+      {/* Motion alert overlay */}
+      {motionAlert && (
+        <div className="fixed inset-0 z-50 pointer-events-none flex items-start justify-center pt-20">
+          <div className="pointer-events-auto animate-bounce rounded-2xl bg-orange-500/95 px-6 py-4 shadow-2xl shadow-orange-500/40 flex items-center gap-3">
+            <Activity className="h-8 w-8 text-white animate-pulse" />
+            <div>
+              <p className="text-lg font-bold text-white">Motion Detected!</p>
+              <p className="text-sm text-white/80">Activity level: {motionLevel.toFixed(1)}%</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Motion border glow effect */}
+      {motionAlert && (
+        <div className="fixed inset-0 z-40 pointer-events-none border-4 border-orange-500 animate-pulse rounded-none" />
+      )}
+
       <header className="relative z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
         <button onClick={handleDisconnect} className="touch-target flex items-center gap-2"><ArrowLeft className="h-5 w-5" /></button>
         <div className="flex items-center gap-2">
@@ -90,6 +136,12 @@ const ViewerView = () => {
             <div className="flex items-center gap-1.5 rounded-full bg-green-600/80 px-3 py-1">
               <span className="h-2 w-2 rounded-full bg-white" />
               <span className="text-xs font-bold">{t("viewer.watching")}</span>
+            </div>
+          )}
+          {motionAlert && (
+            <div className="flex items-center gap-1.5 rounded-full bg-orange-500/90 px-3 py-1 animate-pulse">
+              <Activity className="h-3 w-3" />
+              <span className="text-xs font-bold">MOTION</span>
             </div>
           )}
           {isReconnecting && (
