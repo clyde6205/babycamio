@@ -1,5 +1,13 @@
-import { Video, Mail, Facebook } from "lucide-react";
+import { Video, Mail, Facebook, Instagram, Twitter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+// ── Editable social links — update usernames/URLs here ──
+const SOCIAL_LINKS = {
+  email: "contact@BabyCam.io",
+  facebook: { username: "themoonclyde", url: "https://facebook.com/themoonclyde" },
+  instagram: { username: "yourinstagram", url: "https://instagram.com/yourinstagram" },
+  twitter: { username: "yourtwitter", url: "https://x.com/yourtwitter" },
+};
 
 interface CopyrightFooterProps {
   variant?: "light" | "dark";
@@ -16,6 +24,7 @@ const CopyrightFooter = ({ variant = "dark", showLinks = true }: CopyrightFooter
     ? "text-primary-foreground/40 hover:text-primary-foreground/70 underline"
     : "text-muted-foreground hover:text-foreground underline";
   const borderClass = isLight ? "border-white/10" : "border-border";
+  const sep = <span className="opacity-30">·</span>;
 
   return (
     <footer className={`border-t ${borderClass} px-5 py-5 mt-auto`}>
@@ -29,13 +38,21 @@ const CopyrightFooter = ({ variant = "dark", showLinks = true }: CopyrightFooter
         <p className={`text-[11px] ${textClass}`}>
           © {year} BabyCam.io™ — All Rights Reserved. Patent Pending.
         </p>
-        <div className={`flex flex-wrap justify-center gap-3 text-[11px] ${textClass}`}>
-          <a href="mailto:contact@BabyCam.io" className={`flex items-center gap-1 ${linkClass}`}>
-            <Mail className="h-3 w-3" /> contact@BabyCam.io
+        <div className={`flex flex-wrap justify-center items-center gap-3 text-[11px] ${textClass}`}>
+          <a href={`mailto:${SOCIAL_LINKS.email}`} className={`flex items-center gap-1 ${linkClass}`}>
+            <Mail className="h-3 w-3" /> {SOCIAL_LINKS.email}
           </a>
-          <span className="opacity-30">·</span>
-          <a href="https://facebook.com/themoonclyde" target="_blank" rel="noopener noreferrer" className={`flex items-center gap-1 ${linkClass}`}>
-            <Facebook className="h-3 w-3" /> themoonclyde
+          {sep}
+          <a href={SOCIAL_LINKS.facebook.url} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-1 ${linkClass}`}>
+            <Facebook className="h-3 w-3" /> {SOCIAL_LINKS.facebook.username}
+          </a>
+          {sep}
+          <a href={SOCIAL_LINKS.instagram.url} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-1 ${linkClass}`}>
+            <Instagram className="h-3 w-3" /> {SOCIAL_LINKS.instagram.username}
+          </a>
+          {sep}
+          <a href={SOCIAL_LINKS.twitter.url} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-1 ${linkClass}`}>
+            <Twitter className="h-3 w-3" /> {SOCIAL_LINKS.twitter.username}
           </a>
         </div>
         {showLinks && (
