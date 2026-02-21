@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Video, ArrowLeft, Save, Loader2, Eye, EyeOff, Check, AlertCircle, Settings as SettingsIcon } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Video, ArrowLeft, Save, Loader2, Eye, EyeOff, Check, AlertCircle, Settings as SettingsIcon, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
@@ -33,15 +35,73 @@ const Settings = () => {
   const [visibility, setVisibility] = useState<Record<string, boolean>>({});
   const [savedProviders, setSavedProviders] = useState<Set<string>>(new Set());
 
+  // Camera/motion settings
+  const [motionEnabled, setMotionEnabled] = useState(true);
+  const [recordingDuration, setRecordingDuration] = useState(5);
+  const [motionSensitivity, setMotionSensitivity] = useState(25);
+  const [maxDuration, setMaxDuration] = useState(60);
+  const [savingCamera, setSavingCamera] = useState(false);
+  const [cameraSettingsLoaded, setCameraSettingsLoaded] = useState(false);
+
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { navigate("/login"); return; }
       setUser(session.user);
-      await loadKeys(session.user.id);
+      await Promise.all([loadKeys(session.user.id), loadCameraSettings(session.user.id)]);
     };
     init();
   }, [navigate]);
+
+  const loadCameraSettings = async (userId: string) => {
+    // Load global limits
+    const { data: globalSettings } = await supabase
+      .from("app_settings")
+      .select("setting_value")
+      .eq("setting_key", "motion_recording")
+      .single();
+
+    const global = globalSettings?.setting_value as any;
+    if (global) {
+      setMaxDuration(global.max_duration_minutes || 60);
+      setMotionSensitivity(global.motion_sensitivity || 25);
+      setRecordingDuration(global.default_duration_minutes || 5);
+    }
+
+    // Load user overrides
+    const { data: userSettings } = await supabase
+      .from("user_camera_settings")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (userSettings) {
+      setRecordingDuration(userSettings.recording_duration_minutes);
+      setMotionEnabled(userSettings.motion_enabled);
+      setMotionSensitivity(userSettings.motion_sensitivity);
+    }
+    setCameraSettingsLoaded(true);
+  };
+
+  const saveCameraSettings = async () => {
+    if (!user) return;
+    setSavingCamera(true);
+    try {
+      const clampedDuration = Math.min(Math.max(recordingDuration, 1), maxDuration);
+      const { error } = await supabase
+        .from("user_camera_settings")
+        .upsert({
+          user_id: user.id,
+          recording_duration_minutes: clampedDuration,
+          motion_enabled: motionEnabled,
+          motion_sensitivity: motionSensitivity,
+        }, { onConflict: "user_id" });
+      if (error) throw error;
+      toast({ title: "Camera settings saved", description: `Recording: ${clampedDuration} min, Motion: ${motionEnabled ? "On" : "Off"}` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setSavingCamera(false); }
+  };
 
   const loadKeys = async (userId: string) => {
     setLoading(true);
@@ -127,6 +187,72 @@ const Settings = () => {
       </header>
 
       <main className="mx-auto max-w-2xl px-5 py-6">
+        {/* Camera & Motion Settings */}
+        <Card className="mb-6 overflow-hidden">
+          <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <Activity className="h-5 w-5 text-orange-500" />
+              <div>
+                <h3 className="font-semibold">Motion Detection & Recording</h3>
+                <p className="text-xs text-muted-foreground">Configure auto-recording when motion is detected</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-4 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm font-medium">Motion Detection</Label>
+                <p className="text-xs text-muted-foreground">Automatically detect movement</p>
+              </div>
+              <Switch checked={motionEnabled} onCheckedChange={setMotionEnabled} />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Recording Duration</Label>
+                <span className="text-sm font-bold text-primary">{recordingDuration} min</span>
+              </div>
+              <Slider
+                value={[recordingDuration]}
+                onValueChange={([v]) => setRecordingDuration(v)}
+                min={1}
+                max={maxDuration}
+                step={1}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                How long to record after motion is detected (max {maxDuration} min set by admin)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Motion Sensitivity</Label>
+                <span className="text-sm font-bold text-primary">
+                  {motionSensitivity <= 10 ? "Very High" : motionSensitivity <= 20 ? "High" : motionSensitivity <= 35 ? "Medium" : motionSensitivity <= 50 ? "Low" : "Very Low"}
+                </span>
+              </div>
+              <Slider
+                value={[motionSensitivity]}
+                onValueChange={([v]) => setMotionSensitivity(v)}
+                min={5}
+                max={60}
+                step={1}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Lower value = more sensitive to small movements
+              </p>
+            </div>
+
+            <Button onClick={saveCameraSettings} disabled={savingCamera} size="sm" className="touch-target w-full">
+              {savingCamera ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+              Save Camera Settings
+            </Button>
+          </div>
+        </Card>
+
+        {/* Payment Providers Section */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-1">
             <SettingsIcon className="h-5 w-5 text-primary" />
