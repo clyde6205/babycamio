@@ -1,20 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowLeft,
-  Eye,
-  Volume2,
-  VolumeX,
-  Loader2,
-  RefreshCw,
-  Maximize2,
-  Minimize2,
-  SignalHigh,
-  SignalMedium,
-  SignalLow,
-  WifiOff,
+  ArrowLeft, Eye, Volume2, VolumeX, Loader2, RefreshCw, Maximize2, Minimize2,
+  SignalHigh, SignalMedium, SignalLow, WifiOff,
 } from "lucide-react";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
 import { ConnectionState, RoomEvent, Track, RemoteTrackPublication, RemoteParticipant } from "livekit-client";
@@ -32,6 +23,7 @@ const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
 const ViewerView = () => {
   const { roomName } = useParams<{ roomName: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [muted, setMuted] = useState(false);
@@ -44,158 +36,76 @@ const ViewerView = () => {
   useEffect(() => {
     const getProfile = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate("/login");
-        return;
-      }
-      const { data } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("user_id", session.user.id)
-        .single();
+      if (!session) { navigate("/login"); return; }
+      const { data } = await supabase.from("profiles").select("display_name").eq("user_id", session.user.id).single();
       if (data?.display_name) setDisplayName(data.display_name);
     };
     getProfile();
   }, [navigate]);
 
-  const {
-    room,
-    connectionState,
-    networkQuality,
-    isConnecting,
-    error,
-    connect,
-    disconnect,
-    retry,
-    audioOnly,
-  } = useLiveKit({
-    roomName: roomName || "",
-    participantName: displayName,
-    isPublisher: false,
+  const { room, connectionState, networkQuality, isConnecting, error, connect, disconnect, retry, audioOnly } = useLiveKit({
+    roomName: roomName || "", participantName: displayName, isPublisher: false,
   });
 
   // Handle remote tracks
   useEffect(() => {
     if (!room) return;
-
-    const attachTrack = (publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-      if (!publication.track) return;
-      
-      if (publication.track.kind === Track.Kind.Video && videoRef.current) {
-        publication.track.attach(videoRef.current);
-        setHasRemoteVideo(true);
-      } else if (publication.track.kind === Track.Kind.Audio && audioRef.current) {
-        publication.track.attach(audioRef.current);
-        setHasRemoteAudio(true);
-      }
-    };
-
-    const detachTrack = (publication: RemoteTrackPublication) => {
-      if (publication.track?.kind === Track.Kind.Video) {
-        setHasRemoteVideo(false);
-      } else if (publication.track?.kind === Track.Kind.Audio) {
-        setHasRemoteAudio(false);
-      }
-      publication.track?.detach();
-    };
-
-    room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-      if (track.kind === Track.Kind.Video && videoRef.current) {
-        track.attach(videoRef.current);
-        setHasRemoteVideo(true);
-      } else if (track.kind === Track.Kind.Audio && audioRef.current) {
-        track.attach(audioRef.current);
-        setHasRemoteAudio(true);
-      }
+    room.on(RoomEvent.TrackSubscribed, (track) => {
+      if (track.kind === Track.Kind.Video && videoRef.current) { track.attach(videoRef.current); setHasRemoteVideo(true); }
+      else if (track.kind === Track.Kind.Audio && audioRef.current) { track.attach(audioRef.current); setHasRemoteAudio(true); }
     });
-
     room.on(RoomEvent.TrackUnsubscribed, (track) => {
       if (track.kind === Track.Kind.Video) setHasRemoteVideo(false);
       if (track.kind === Track.Kind.Audio) setHasRemoteAudio(false);
       track.detach();
     });
-
-    // Attach any already-subscribed tracks
     room.remoteParticipants.forEach((participant) => {
       participant.trackPublications.forEach((pub) => {
         if (pub.isSubscribed && pub.track) {
-          if (pub.track.kind === Track.Kind.Video && videoRef.current) {
-            pub.track.attach(videoRef.current);
-            setHasRemoteVideo(true);
-          } else if (pub.track.kind === Track.Kind.Audio && audioRef.current) {
-            pub.track.attach(audioRef.current);
-            setHasRemoteAudio(true);
-          }
+          if (pub.track.kind === Track.Kind.Video && videoRef.current) { pub.track.attach(videoRef.current); setHasRemoteVideo(true); }
+          else if (pub.track.kind === Track.Kind.Audio && audioRef.current) { pub.track.attach(audioRef.current); setHasRemoteAudio(true); }
         }
       });
     });
-
-    return () => {
-      room.removeAllListeners(RoomEvent.TrackSubscribed);
-      room.removeAllListeners(RoomEvent.TrackUnsubscribed);
-    };
+    return () => { room.removeAllListeners(RoomEvent.TrackSubscribed); room.removeAllListeners(RoomEvent.TrackUnsubscribed); };
   }, [room, connectionState]);
 
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen?.();
-      setIsFullscreen(false);
-    }
+    if (!document.fullscreenElement) { containerRef.current.requestFullscreen?.(); setIsFullscreen(true); }
+    else { document.exitFullscreen?.(); setIsFullscreen(false); }
   }, []);
 
-  const handleDisconnect = () => {
-    disconnect();
-    navigate("/dashboard");
-  };
-
+  const handleDisconnect = () => { disconnect(); navigate("/dashboard"); };
   const isConnected = connectionState === ConnectionState.Connected;
   const isReconnecting = connectionState === ConnectionState.Reconnecting;
   const friendlyName = roomName?.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ") || "Room";
 
   return (
     <div ref={containerRef} className="flex min-h-[100dvh] flex-col bg-black text-white select-none">
-      {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
-        <button onClick={handleDisconnect} className="touch-target flex items-center gap-2">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-
+        <button onClick={handleDisconnect} className="touch-target flex items-center gap-2"><ArrowLeft className="h-5 w-5" /></button>
         <div className="flex items-center gap-2">
           {isConnected && hasRemoteVideo && (
             <div className="flex items-center gap-1.5 rounded-full bg-green-600/80 px-3 py-1">
               <span className="h-2 w-2 rounded-full bg-white" />
-              <span className="text-xs font-bold">WATCHING</span>
+              <span className="text-xs font-bold">{t("viewer.watching")}</span>
             </div>
           )}
           {isReconnecting && (
             <div className="flex items-center gap-1.5 rounded-full bg-yellow-600/80 px-3 py-1">
               <Loader2 className="h-3 w-3 animate-spin" />
-              <span className="text-xs font-bold">RECONNECTING</span>
+              <span className="text-xs font-bold">{t("camera.reconnecting")}</span>
             </div>
           )}
         </div>
-
-        <div className="flex items-center gap-2">
-          <NetworkQualityIcon quality={networkQuality} />
-        </div>
+        <div className="flex items-center gap-2"><NetworkQualityIcon quality={networkQuality} /></div>
       </header>
 
-      {/* Video area */}
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={muted}
-          className={`absolute inset-0 h-full w-full object-contain bg-black ${!hasRemoteVideo ? "hidden" : ""}`}
-        />
+        <video ref={videoRef} autoPlay playsInline muted={muted} className={`absolute inset-0 h-full w-full object-contain bg-black ${!hasRemoteVideo ? "hidden" : ""}`} />
         <audio ref={audioRef} autoPlay muted={muted} className="hidden" />
 
-        {/* No video — show status */}
         {isConnected && !hasRemoteVideo && (
           <div className="flex flex-col items-center justify-center gap-3">
             {hasRemoteAudio ? (
@@ -203,19 +113,18 @@ const ViewerView = () => {
                 <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-[hsl(213,80%,70%)]/30 bg-white/5">
                   <Volume2 className="h-12 w-12 text-[hsl(213,80%,70%)] animate-pulse" />
                 </div>
-                <p className="text-lg font-semibold">Audio Only</p>
-                <p className="text-sm text-white/50">Camera is streaming audio — video unavailable</p>
+                <p className="text-lg font-semibold">{t("viewer.audioOnly")}</p>
+                <p className="text-sm text-white/50">{t("viewer.audioOnlyDesc")}</p>
               </>
             ) : (
               <>
                 <Loader2 className="h-10 w-10 animate-spin text-white/30" />
-                <p className="text-sm text-white/50">Waiting for camera to start streaming...</p>
+                <p className="text-sm text-white/50">{t("viewer.waitingCamera")}</p>
               </>
             )}
           </div>
         )}
 
-        {/* Pre-connect / error state */}
         {!isConnected && !isReconnecting && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 brand-gradient">
             <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-[hsl(213,80%,70%)]/30 bg-white/5">
@@ -223,35 +132,21 @@ const ViewerView = () => {
             </div>
             <div className="text-center">
               <h2 className="mb-1 text-xl font-bold capitalize">{friendlyName}</h2>
-              <p className="text-sm text-white/50">Connect to view live camera feed</p>
+              <p className="text-sm text-white/50">{t("viewer.connectToView")}</p>
             </div>
-
             {error && (
               <div className="rounded-lg bg-red-500/20 px-4 py-2 text-center">
                 <p className="text-sm text-red-300">{error}</p>
               </div>
             )}
-
-            <Button
-              size="lg"
-              onClick={error ? retry : connect}
-              disabled={isConnecting}
-              className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target"
-            >
-              {isConnecting ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              ) : error ? (
-                <RefreshCw className="mr-2 h-5 w-5" />
-              ) : (
-                <Eye className="mr-2 h-5 w-5" />
-              )}
-              {isConnecting ? "Connecting..." : error ? "Retry" : "Watch Live"}
+            <Button size="lg" onClick={error ? retry : connect} disabled={isConnecting} className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target">
+              {isConnecting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : error ? <RefreshCw className="mr-2 h-5 w-5" /> : <Eye className="mr-2 h-5 w-5" />}
+              {isConnecting ? t("camera.connecting") : error ? t("camera.retry") : t("viewer.watchLive")}
             </Button>
           </div>
         )}
       </div>
 
-      {/* Controls */}
       {isConnected && (
         <div className="safe-bottom bg-gradient-to-t from-black/90 to-transparent px-6 pb-4 pt-6">
           <div className="flex items-center justify-center gap-8">
@@ -259,29 +154,24 @@ const ViewerView = () => {
               <div className={`flex h-12 w-12 items-center justify-center rounded-full ${muted ? "bg-red-500/80" : "bg-white/15"}`}>
                 {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
               </div>
-              <span className="text-[10px] opacity-60">{muted ? "Unmute" : "Sound"}</span>
+              <span className="text-[10px] opacity-60">{muted ? t("viewer.unmute") : t("viewer.sound")}</span>
             </button>
-
             <button onClick={toggleFullscreen} className="touch-target flex flex-col items-center gap-1.5">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15">
                 {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
               </div>
-              <span className="text-[10px] opacity-60">Fullscreen</span>
+              <span className="text-[10px] opacity-60">{t("viewer.fullscreen")}</span>
             </button>
-
             <button onClick={handleDisconnect} className="touch-target flex flex-col items-center gap-1.5">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-600/30">
                 <ArrowLeft className="h-5 w-5" />
               </div>
-              <span className="text-[10px] opacity-60">Leave</span>
+              <span className="text-[10px] opacity-60">{t("viewer.leave")}</span>
             </button>
           </div>
-
-          {/* Connection info */}
           <div className="mt-3 text-center">
             <p className="text-[10px] uppercase tracking-wider text-white/30">
-              {friendlyName} · BabyCam.io ·{" "}
-              {networkQuality === "excellent" ? "4K" : networkQuality === "good" ? "HD" : networkQuality === "fair" ? "SD" : "Audio"}
+              {friendlyName} · BabyCam.io · {networkQuality === "excellent" ? "4K" : networkQuality === "good" ? "HD" : networkQuality === "fair" ? "SD" : "Audio"}
             </p>
           </div>
         </div>
