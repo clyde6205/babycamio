@@ -250,9 +250,36 @@ try {
         adb install -r babycam-debug.apk
         if ($LASTEXITCODE -eq 0) {
             Write-Host "✅ Installed on your phone!" -ForegroundColor Green
+
+            # Clear old logcat, then launch and capture crash logs
+            adb logcat -c 2>$null
             Write-Host "🚀 Launching BabyCam.io..." -ForegroundColor Cyan
             adb shell am start -n "io.babycam.app/.MainActivity"
-            Write-Host "`n🍼 BabyCam.io is running on your phone!" -ForegroundColor Green
+
+            Write-Host "`n⏳ Waiting 8 seconds to capture crash logs..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 8
+
+            Write-Host "`n╔══════════════════════════════════════════════╗" -ForegroundColor Cyan
+            Write-Host "║  📋  DEVICE CRASH LOG (last 8 seconds)        ║" -ForegroundColor Cyan
+            Write-Host "╚══════════════════════════════════════════════╝" -ForegroundColor Cyan
+
+            # Capture FATAL, crash, and app-related errors
+            $logFile = "$projectDir\crash-log.txt"
+            adb logcat -d -t 500 *> $logFile
+            
+            # Show the most relevant lines
+            Write-Host "`n--- FATAL / CRASH lines ---" -ForegroundColor Red
+            Get-Content $logFile | Select-String -Pattern "FATAL|AndroidRuntime|crash|died|Exception|Error|io\.babycam" -AllMatches | Select-Object -First 60 | ForEach-Object {
+                Write-Host $_.Line -ForegroundColor Red
+            }
+
+            Write-Host "`n--- WebView / Capacitor lines ---" -ForegroundColor Yellow
+            Get-Content $logFile | Select-String -Pattern "Capacitor|WebView|chromium|net::" -AllMatches | Select-Object -First 30 | ForEach-Object {
+                Write-Host $_.Line -ForegroundColor Yellow
+            }
+
+            Write-Host "`n📄 Full log saved to: $logFile" -ForegroundColor Cyan
+            Write-Host "   Copy/paste the RED lines above to diagnose the issue.`n" -ForegroundColor White
         } else {
             Write-Host "⚠️  Install failed. Try manually:" -ForegroundColor Yellow
             Write-Host "   adb install babycam-debug.apk" -ForegroundColor White
