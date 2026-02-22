@@ -62,9 +62,29 @@ if (Test-Path $apkPath) {
     Copy-Item $apkPath "babycam-debug.apk" -Force
     Write-Host "📋 Copied to: babycam-debug.apk" -ForegroundColor Green
     
-    Write-Host "`n📲 To install on your phone:" -ForegroundColor Cyan
-    Write-Host "   adb install babycam-debug.apk" -ForegroundColor White
-    Write-Host "   Or transfer babycam-debug.apk to your phone and tap to install" -ForegroundColor White
+    # 8. Auto-install on connected Android device
+    Write-Host "`n📲 Checking for connected Android device..." -ForegroundColor Yellow
+    $adbDevices = adb devices 2>&1
+    $connected = ($adbDevices | Select-String "device$" | Measure-Object).Count
+    
+    if ($connected -gt 0) {
+        Write-Host "📱 Device found! Installing APK..." -ForegroundColor Green
+        adb install -r babycam-debug.apk
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✅ Installed on your phone!" -ForegroundColor Green
+            Write-Host "`n🚀 Launching BabyCam.io..." -ForegroundColor Cyan
+            adb shell am start -n "app.lovable.1b7444d59ac1487f9e86e1b166f05b65/.MainActivity"
+            Write-Host "🍼 BabyCam.io is running on your phone!" -ForegroundColor Green
+        } else {
+            Write-Host "❌ Install failed. Check USB debugging is enabled." -ForegroundColor Red
+        }
+    } else {
+        Write-Host "⚠️  No device found. Make sure:" -ForegroundColor Yellow
+        Write-Host "   1. USB cable is connected" -ForegroundColor White
+        Write-Host "   2. USB Debugging is ON (Settings > Developer Options)" -ForegroundColor White
+        Write-Host "   3. You tapped 'Allow' on the USB debugging prompt" -ForegroundColor White
+        Write-Host "`n   Then run: adb install babycam-debug.apk" -ForegroundColor White
+    }
 } else {
     Write-Host "❌ APK not found at expected path" -ForegroundColor Red
 }
