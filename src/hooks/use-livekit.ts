@@ -294,10 +294,43 @@ export const useLiveKit = ({
   }, [isPublisher]);
 
   // ── Enable devices with cascading fallbacks ──
-  const enableDevices = useCallback(async (room: Room, quality: NetworkQuality) => {
+  // preAcquiredStream: if provided, publish its tracks directly (avoids second getUserMedia which fails on Android)
+  const enableDevices = useCallback(async (room: Room, quality: NetworkQuality, preAcquiredStream?: MediaStream) => {
     if (!isPublisher) return;
 
-    // Standard device enable — permissions already granted by pre-acquire in connectToRoom
+    if (preAcquiredStream) {
+      // PUBLISH PRE-ACQUIRED TRACKS DIRECTLY — no second getUserMedia needed
+      try {
+        const videoTrack = preAcquiredStream.getVideoTracks()[0];
+        const audioTrack = preAcquiredStream.getAudioTracks()[0];
+
+        if (quality === "poor" || quality === "offline") {
+          // Audio only — stop video track
+          if (videoTrack) videoTrack.stop();
+          if (audioTrack) {
+            console.log("[LiveKit] Publishing pre-acquired audio track (audio-only mode)");
+            await room.localParticipant.publishTrack(audioTrack, { source: Track.Source.Microphone });
+          }
+          setAudioOnly(true);
+        } else {
+          if (videoTrack) {
+            console.log("[LiveKit] Publishing pre-acquired video track directly");
+            await room.localParticipant.publishTrack(videoTrack, { source: Track.Source.Camera });
+          }
+          if (audioTrack) {
+            console.log("[LiveKit] Publishing pre-acquired audio track directly");
+            await room.localParticipant.publishTrack(audioTrack, { source: Track.Source.Microphone });
+          }
+          setAudioOnly(false);
+        }
+        console.log("[LiveKit] ✅ Pre-acquired tracks published successfully");
+        return;
+      } catch (e: any) {
+        console.warn("[LiveKit] publishTrack with pre-acquired stream failed:", e.message);
+        // Stop pre-acquired stream and fall through to standard method
+        preAcquiredStream.getTracks().forEach(t => t.stop());
+      }
+    }
 
     // Fallback path (no pre-acquired stream, e.g. auto-reconnect)
     try {
@@ -428,14 +461,9 @@ export const useLiveKit = ({
       // Acquire wake lock to keep screen on (critical for baby monitor)
       await requestWakeLock();
 
-      // Release pre-acquired stream BEFORE LiveKit opens the camera — avoids device lock → black screen
-      if (preAcquiredStream) {
-        console.log("[LiveKit] Releasing pre-acquired stream before LiveKit device enable");
-        preAcquiredStream.getTracks().forEach(t => t.stop());
-      }
-
-      // Enable devices — permissions already granted by pre-acquire above
-      await enableDevices(room, quality);
+      // Pass pre-acquired stream directly to enableDevices — it will publish the tracks
+      // WITHOUT calling getUserMedia again (which fails on Android when gesture context is lost)
+      await enableDevices(room, quality, preAcquiredStream);
 
       // Start heartbeat
       startHeartbeat(room);
