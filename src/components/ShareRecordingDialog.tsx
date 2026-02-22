@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Share2, Loader2, Copy, Check, UserPlus, Link2, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import SmsSender from "@/components/SmsSender";
 
 interface ShareRecordingDialogProps {
   recordingId: string;
@@ -173,20 +174,11 @@ const ShareRecordingDialog = ({ recordingId, recordingName, filePath }: ShareRec
             </p>
           </div>
 
-          {/* Share via SMS */}
+          {/* Share via SMS — Worldwide via Twilio + Local fallback */}
           {shareLink && (
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                const smsBody = encodeURIComponent(
-                  `Check out this recording from BabyCam.io!\n\n${shareLink}\n\nGet the app: https://babycamio.lovable.app/install`
-                );
-                window.open(`sms:?body=${smsBody}`, "_self");
-              }}
-            >
-              <MessageSquare className="h-4 w-4 mr-2" /> Send via SMS
-            </Button>
+            <SmsSender
+              defaultMessage={`Check out this recording from BabyCam.io!\n\n${shareLink}\n\nGet the app: https://babycamio.lovable.app/install`}
+            />
           )}
 
           {/* Native Share (if available) */}
