@@ -2,12 +2,16 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Video, Download, Smartphone, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Video, Download, Smartphone, CheckCircle2, ArrowLeft, Copy } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { toast } from "sonner";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
+
+const APP_URL = "https://babycamio.lovable.app";
 
 const InstallApp = () => {
   const navigate = useNavigate();
@@ -122,6 +126,43 @@ const InstallApp = () => {
                 </div>
               ))}
             </div>
+
+            {/* QR Code & Share Link */}
+            <Card className="p-5 bg-white/5 border-white/10 space-y-4">
+              <p className="text-sm font-semibold">Scan to install on any phone:</p>
+              <div className="flex justify-center">
+                <div className="bg-white p-3 rounded-xl">
+                  <QRCodeSVG value={APP_URL} size={180} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={APP_URL}
+                  className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-primary-foreground"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-white/20 text-primary-foreground"
+                  onClick={() => {
+                    navigator.clipboard.writeText(APP_URL);
+                    toast.success("Link copied!");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              {navigator.share && (
+                <Button
+                  variant="outline"
+                  className="w-full border-white/20 text-primary-foreground"
+                  onClick={() => navigator.share({ title: "BabyCam.io", text: "Install BabyCam.io - Professional baby monitoring", url: APP_URL })}
+                >
+                  Share Link
+                </Button>
+              )}
+            </Card>
           </>
         )}
       </main>
