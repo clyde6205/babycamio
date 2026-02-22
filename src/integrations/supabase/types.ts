@@ -190,6 +190,7 @@ export type Database = {
           name: string
           notes: string | null
           protocol: string
+          room_id: string | null
           stream_url: string
           thumbnail_url: string | null
           updated_at: string
@@ -202,6 +203,7 @@ export type Database = {
           name: string
           notes?: string | null
           protocol?: string
+          room_id?: string | null
           stream_url: string
           thumbnail_url?: string | null
           updated_at?: string
@@ -214,12 +216,21 @@ export type Database = {
           name?: string
           notes?: string | null
           protocol?: string
+          room_id?: string | null
           stream_url?: string
           thumbnail_url?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "external_cameras_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       growth_measurements: {
         Row: {
