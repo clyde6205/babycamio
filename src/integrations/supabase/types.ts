@@ -107,6 +107,48 @@ export type Database = {
         }
         Relationships: []
       }
+      camera_heartbeats: {
+        Row: {
+          battery_level: number | null
+          created_at: string
+          id: string
+          last_heartbeat: string
+          network_quality: string | null
+          network_type: string | null
+          room_name: string
+          status: string
+          stream_active: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          battery_level?: number | null
+          created_at?: string
+          id?: string
+          last_heartbeat?: string
+          network_quality?: string | null
+          network_type?: string | null
+          room_name: string
+          status?: string
+          stream_active?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          battery_level?: number | null
+          created_at?: string
+          id?: string
+          last_heartbeat?: string
+          network_quality?: string | null
+          network_type?: string | null
+          room_name?: string
+          status?: string
+          stream_active?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       caregiver_access: {
         Row: {
           access_level: string

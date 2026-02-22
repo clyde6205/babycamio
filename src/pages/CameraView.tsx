@@ -12,6 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
 import { useMotionDetection } from "@/hooks/use-motion-detection";
+import { useCameraHeartbeat } from "@/hooks/use-camera-heartbeat";
 import { ConnectionState, Track } from "livekit-client";
 
 const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
@@ -107,6 +108,15 @@ const CameraView = () => {
     videoRef.current,
     { threshold: motionSensitivity, minMotionPercent: motionMinPercent, cooldown: 3000 }
   );
+
+  // Camera health heartbeat — sends status every 30s
+  useCameraHeartbeat({
+    roomName: roomName || "",
+    userId,
+    isConnected: connectionState === ConnectionState.Connected,
+    networkQuality,
+    streamActive: videoEnabled,
+  });
 
   // Send motion data + log sleep event + trigger cry detection
   useEffect(() => {

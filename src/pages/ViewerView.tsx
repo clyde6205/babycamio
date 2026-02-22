@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Eye, Volume2, VolumeX, Loader2, RefreshCw, Maximize2, Minimize2,
-  SignalHigh, SignalMedium, SignalLow, WifiOff, Activity, Baby,
+  SignalHigh, SignalMedium, SignalLow, WifiOff, Activity, Baby, Heart, BatteryWarning, WifiOff as WifiOffIcon2,
 } from "lucide-react";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
 import { ConnectionState, RoomEvent, Track } from "livekit-client";
@@ -42,6 +42,14 @@ const ViewerView = () => {
   const [cryAlert, setCryAlert] = useState<string | null>(null);
   const motionTimeoutRef = useRef<number | null>(null);
 
+  // Camera health state
+  const [cameraHealth, setCameraHealth] = useState<{
+    status: string;
+    battery_level: number | null;
+    network_quality: string | null;
+    last_heartbeat: string | null;
+  } | null>(null);
+
   // Try to load user profile if logged in, but don't block viewer for unauthenticated users
   useEffect(() => {
     const loadProfile = async () => {
@@ -55,6 +63,36 @@ const ViewerView = () => {
     };
     loadProfile();
   }, []);
+
+  // Subscribe to camera health updates in realtime
+  useEffect(() => {
+    if (!roomName) return;
+
+    // Initial fetch
+    supabase
+      .from("camera_heartbeats")
+      .select("status, battery_level, network_quality, last_heartbeat")
+      .eq("room_name", roomName)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setCameraHealth(data as any);
+      });
+
+    // Realtime subscription
+    const channel = supabase
+      .channel(`heartbeat-${roomName}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "camera_heartbeats", filter: `room_name=eq.${roomName}` },
+        (payload) => {
+          const row = payload.new as any;
+          if (row) setCameraHealth({ status: row.status, battery_level: row.battery_level, network_quality: row.network_quality, last_heartbeat: row.last_heartbeat });
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [roomName]);
 
   const { room, connectionState, networkQuality, connectionType, isConnecting, error, connect, disconnect, retry, audioOnly } = useLiveKit({
     roomName: roomName || "", participantName: displayName, isPublisher: false,
@@ -142,6 +180,25 @@ const ViewerView = () => {
         </div>
       )}
       {cryAlert && <div className="fixed inset-0 z-40 pointer-events-none border-4 border-red-500 animate-pulse rounded-none" />}
+
+      {/* Camera Health Status Banner */}
+      {cameraHealth && cameraHealth.status !== "healthy" && (
+        <div className={`px-4 py-2 text-center text-sm font-semibold flex items-center justify-center gap-2 ${
+          cameraHealth.status === "disconnected" ? "bg-red-600" : "bg-yellow-600"
+        }`}>
+          {cameraHealth.status === "disconnected" ? (
+            <><WifiOff className="h-4 w-4" /> Camera offline — last seen {cameraHealth.last_heartbeat ? new Date(cameraHealth.last_heartbeat).toLocaleTimeString() : "unknown"}</>
+          ) : (
+            <><BatteryWarning className="h-4 w-4" /> Camera battery low ({cameraHealth.battery_level}%) — plug in soon</>
+          )}
+        </div>
+      )}
+      {cameraHealth?.status === "healthy" && (
+        <div className="px-4 py-1 text-center text-[10px] font-medium flex items-center justify-center gap-1 bg-green-600/20 text-green-400">
+          <Heart className="h-3 w-3" /> Camera healthy
+          {cameraHealth.battery_level !== null && ` · 🔋 ${cameraHealth.battery_level}%`}
+        </div>
+      )}
 
       <header className="relative z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
         <button onClick={handleDisconnect} className="touch-target flex items-center gap-2"><ArrowLeft className="h-5 w-5" /></button>
