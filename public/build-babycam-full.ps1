@@ -111,6 +111,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "   ✅ Dependencies installed`n" -ForegroundColor Green
 
+# ── Step 3b: Create .env with Supabase credentials (not in git repo) ──
+Write-Host "🔑 Setting up environment variables..." -ForegroundColor Yellow
+@"
+VITE_SUPABASE_URL=https://ztzplsvrmtvdjykxffyj.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0enBsc3ZybXR2ZGp5a3hmZnlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2MjM1NDQsImV4cCI6MjA4NzE5OTU0NH0.IHJYKn1iTsbdyiBcW6wC0AlqUalp3AF23tezz6rw3OY
+VITE_SUPABASE_PROJECT_ID=ztzplsvrmtvdjykxffyj
+"@ | Set-Content ".env" -Encoding UTF8
+Write-Host "   ✅ Environment variables configured`n" -ForegroundColor Green
+
 # ── Step 4: Build the web app ──
 Write-Host "🔨 Building web app..." -ForegroundColor Yellow
 npm run build
