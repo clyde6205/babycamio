@@ -3,6 +3,18 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
+// ── Force clear stale service workers on startup ────────────
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const reg of registrations) {
+      // Force activate waiting SW immediately
+      if (reg.waiting) {
+        reg.waiting.postMessage({ type: "SKIP_WAITING" });
+      }
+    }
+  });
+}
+
 // ── Global error handlers ──────────────────────────────────
 // Catch unhandled JS errors (network failures, script errors, etc.)
 window.addEventListener("error", (event) => {

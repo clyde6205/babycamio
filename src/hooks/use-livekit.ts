@@ -89,13 +89,11 @@ const getRoomOptions = (quality: NetworkQuality, isPublisher: boolean, connType:
     disconnectOnPageLeave: false, // We manage lifecycle manually for persistence
     reconnectPolicy: {
       nextRetryDelayInMs: (context) => {
-        // Ultra-aggressive on cellular/bluetooth: 200ms start, max 5s
-        // Normal WiFi: 300ms start, max 8s
         const isMobile = connType === "cellular" || connType === "bluetooth";
         const baseDelay = isMobile ? 200 : 300;
         const maxDelay = isMobile ? 5000 : 8000;
-        const maxRetries = 50; // Never give up easily
-        const delay = Math.min(baseDelay * Math.pow(1.5, context.retryCount), maxDelay);
+        const maxRetries = 100; // Effectively never give up
+        const delay = Math.min(baseDelay * Math.pow(1.3, context.retryCount), maxDelay);
         return context.retryCount < maxRetries ? delay : null;
       },
     },
@@ -162,7 +160,7 @@ const fetchTokenWithRetry = async (
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout per attempt
+      const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout — generous for slow networks worldwide
 
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/livekit-token`,
@@ -185,7 +183,7 @@ const fetchTokenWithRetry = async (
       lastError = err;
       console.warn(`[LiveKit] Token fetch attempt ${attempt + 1}/${maxRetries} failed:`, err.message);
       if (attempt < maxRetries - 1) {
-        await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // 1s, 2s, 3s backoff
+        await new Promise(r => setTimeout(r, 2000 * (attempt + 1))); // 2s, 4s, 6s backoff for slow networks
       }
     }
   }
@@ -385,7 +383,15 @@ export const useLiveKit = ({
 
       // ── Connect ──
       console.log(`[LiveKit] Connecting via ${connType} (${quality}) to ${url} room: ${roomName}`);
-      await room.connect(url, token);
+      await room.connect(url, token, {
+        rtcConfig: {
+          iceTransportPolicy: "all",
+          iceCandidatePoolSize: 4,
+          bundlePolicy: "max-bundle",
+        },
+        peerConnectionTimeout: 30000,
+        websocketTimeout: 30000,
+      });
       console.log("[LiveKit] ✅ Connected! Room:", room.name);
 
       setConnectionState(ConnectionState.Connected);
