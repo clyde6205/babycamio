@@ -7,7 +7,7 @@ import { useSubscription } from "@/hooks/use-subscription";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Video, VideoOff, Mic, MicOff, Wifi, WifiOff, Loader2, RefreshCw,
-  Signal, SignalLow, SignalMedium, SignalHigh, Volume2, Activity, Circle,
+  Signal, SignalLow, SignalMedium, SignalHigh, Volume2, Activity, Circle, WifiOff as WifiOffIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
@@ -43,6 +43,7 @@ const CameraView = () => {
   const [displayName, setDisplayName] = useState("Camera");
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerRef = useRef<number | null>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -275,6 +276,28 @@ const CameraView = () => {
     if (isMotionDetected && motionEnabled && !isRecording && connectionState === ConnectionState.Connected) startRecording();
   }, [isMotionDetected, motionEnabled, isRecording, connectionState, startRecording]);
 
+  // Online/offline detection
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
+  }, []);
+
+  // Manual record handler
+  const handleManualRecord = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      if (!isOnline) {
+        toast({ title: "No internet", description: "Recordings require internet to save to cloud.", variant: "destructive" });
+        return;
+      }
+      startRecording();
+    }
+  }, [isRecording, isOnline, startRecording, stopRecording, toast]);
+
   useEffect(() => {
     return () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
@@ -449,6 +472,14 @@ const CameraView = () => {
         )}
       </div>
 
+      {/* Offline Warning Banner */}
+      {!isOnline && (
+        <div className="bg-red-600 px-4 py-2 text-center text-sm font-semibold flex items-center justify-center gap-2">
+          <WifiOff className="h-4 w-4" />
+          No internet — recordings need a connection to save to cloud
+        </div>
+      )}
+
       {isConnected && (
         <div className="safe-bottom bg-gradient-to-t from-black/90 to-transparent px-6 pb-4 pt-6">
           <div className="flex items-center justify-center gap-5">
@@ -470,14 +501,13 @@ const CameraView = () => {
               </div>
               <span className="text-[10px] opacity-60">{motionEnabled ? "Motion" : "No Motion"}</span>
             </button>
-            {isRecording && (
-              <button onClick={stopRecording} className="touch-target flex flex-col items-center gap-1.5">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/80 animate-pulse">
-                  <Circle className="h-5 w-5 fill-current" />
-                </div>
-                <span className="text-[10px] opacity-60">Stop Rec</span>
-              </button>
-            )}
+            {/* Manual Record Button */}
+            <button onClick={handleManualRecord} className="touch-target flex flex-col items-center gap-1.5">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${isRecording ? "bg-red-500/80 animate-pulse" : "bg-white/15"}`}>
+                <Circle className={`h-5 w-5 ${isRecording ? "fill-current" : ""}`} />
+              </div>
+              <span className="text-[10px] opacity-60">{isRecording ? `REC ${formatTime(recordingTimeLeft)}` : "Record"}</span>
+            </button>
             <button onClick={handleDisconnect} className="touch-target flex flex-col items-center gap-1.5">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-600/30">
                 <VideoOff className="h-6 w-6" />

@@ -48,7 +48,7 @@ serve(async (req) => {
             // Record payment
             await supabase.from("payments").insert({
               user_id: userId,
-              amount_cents: session.amount_total || 997,
+              amount_cents: session.amount_total || 1097,
               currency: session.currency || "usd",
               payment_provider: "stripe",
               provider_payment_id: session.payment_intent,
@@ -88,7 +88,7 @@ serve(async (req) => {
 
             await supabase.from("payments").insert({
               user_id: userId,
-              amount_cents: data.line_items?.[0]?.amount || 997,
+              amount_cents: data.line_items?.[0]?.amount || 1097,
               currency: "PHP",
               payment_provider: "paymongo",
               provider_payment_id: event.data.id,

@@ -106,12 +106,12 @@ const Pricing = () => {
               <div className="mt-4 flex items-baseline gap-1">
                 {billingCycle === "monthly" ? (
                   <>
-                    <span className="text-4xl font-extrabold">$9.97</span>
+                    <span className="text-4xl font-extrabold">$10.97</span>
                     <span className="text-primary-foreground/50">{t("pricing.month")}</span>
                   </>
                 ) : (
                   <>
-                    <span className="text-4xl font-extrabold">$89</span>
+                    <span className="text-4xl font-extrabold">$99</span>
                     <span className="text-primary-foreground/50">{t("pricing.year")}</span>
                     <span className="ml-2 rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-bold text-green-400">{t("pricing.save26")}</span>
                   </>
