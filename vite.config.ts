@@ -18,19 +18,20 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      // Disable SW in Capacitor builds to prevent stale cache issues
+      selfDestroying: true,
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
-        // Never cache auth callbacks, LiveKit WebSocket, or Supabase API calls
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api/, /^\/functions/],
-        // Don't cache Supabase or LiveKit traffic
         navigateFallback: null,
+        // Force fresh content — never serve stale JS/HTML from cache
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           { urlPattern: /^https:\/\/fonts\.googleapis\.com/, handler: "StaleWhileRevalidate", options: { cacheName: "google-fonts-stylesheets" } },
           { urlPattern: /^https:\/\/fonts\.gstatic\.com/, handler: "CacheFirst", options: { cacheName: "google-fonts-webfonts", expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 } } },
         ],
-        // Exclude all API/realtime traffic from service worker interception
         ignoreURLParametersMatching: [/.*/],
       },
       manifest: {
