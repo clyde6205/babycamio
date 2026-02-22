@@ -3,14 +3,27 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// ── Force clear stale service workers on startup ────────────
+// ── Force clear stale service workers + caches on startup ────────────
 if ("serviceWorker" in navigator) {
+  // Nuke ALL service worker caches so the app always loads the latest code
+  if ("caches" in window) {
+    caches.keys().then((names) => {
+      for (const name of names) {
+        caches.delete(name);
+        console.log("[SW] Cleared cache:", name);
+      }
+    });
+  }
   navigator.serviceWorker.getRegistrations().then((registrations) => {
     for (const reg of registrations) {
       // Force activate waiting SW immediately
       if (reg.waiting) {
         reg.waiting.postMessage({ type: "SKIP_WAITING" });
       }
+      // Unregister old service workers entirely to prevent stale caching
+      reg.unregister().then(() => {
+        console.log("[SW] Unregistered stale service worker");
+      });
     }
   });
 }
