@@ -234,15 +234,26 @@ export const useLiveKit = ({
       setConnectionState(ConnectionState.Connected);
       setRoomInstance(room);
 
+      // Enable devices separately so connection survives device errors
       if (isPublisher) {
-        // Enable camera + mic
-        if (quality === "poor") {
-          // Audio only on very poor connections
-          await room.localParticipant.setMicrophoneEnabled(true);
-          setAudioOnly(true);
-        } else {
-          await room.localParticipant.enableCameraAndMicrophone();
-          setAudioOnly(false);
+        try {
+          if (quality === "poor") {
+            await room.localParticipant.setMicrophoneEnabled(true);
+            setAudioOnly(true);
+          } else {
+            await room.localParticipant.enableCameraAndMicrophone();
+            setAudioOnly(false);
+          }
+        } catch (deviceErr: any) {
+          console.warn("[LiveKit] Device error (connection stays open):", deviceErr.message);
+          // Try camera only, then mic only, then accept no devices
+          try {
+            await room.localParticipant.setCameraEnabled(true);
+          } catch { /* no camera available */ }
+          try {
+            await room.localParticipant.setMicrophoneEnabled(true);
+          } catch { /* no mic available */ }
+          setError(null); // Don't show error — connection is alive
         }
       }
     } catch (err: any) {
