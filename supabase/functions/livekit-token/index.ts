@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -14,28 +14,6 @@ serve(async (req) => {
   }
 
   try {
-    // --- Authentication check ---
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const { roomName, participantName, isPublisher } = await req.json();
 
     if (!roomName || !participantName) {
@@ -45,24 +23,46 @@ serve(async (req) => {
       });
     }
 
-    // --- Access control ---
-    // Publishers (camera phone) must own the room
-    // Viewers (watchers) can join ANY room from anywhere in the world
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // --- Authentication: optional for viewers, required for publishers ---
+    let userId = "anonymous-" + crypto.randomUUID().substring(0, 8);
+    const authHeader = req.headers.get("Authorization");
+
+    if (authHeader) {
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (!authError && user) {
+        userId = user.id;
+      }
+    }
+
+    // Publishers MUST be authenticated and own the room
     if (isPublisher === true) {
+      if (userId.startsWith("anonymous-")) {
+        return new Response(JSON.stringify({ error: "Authentication required to broadcast" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { data: room } = await supabase
         .from("rooms")
         .select("owner_id")
         .eq("room_name", roomName)
         .maybeSingle();
 
-      if (room && room.owner_id !== user.id) {
+      if (room && room.owner_id !== userId) {
         return new Response(JSON.stringify({ error: "Only the room owner can broadcast" }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
-    // Viewers: no ownership check — anyone authenticated can watch from anywhere
+
+    // Viewers: NO restrictions — anyone can watch from anywhere in the world
 
     // --- Generate LiveKit JWT ---
     const apiKey = Deno.env.get("LIVEKIT_API_KEY");
@@ -88,7 +88,7 @@ serve(async (req) => {
     const now = Math.floor(Date.now() / 1000);
     const payload = {
       iss: apiKey,
-      sub: user.id,
+      sub: userId,
       name: participantName,
       nbf: now,
       exp: now + 86400,
@@ -98,7 +98,7 @@ serve(async (req) => {
         roomJoin: true,
         canPublish: isPublisher === true,
         canSubscribe: true,
-        canPublishData: true,
+        canPublishData: isPublisher === true,
       },
     };
 
@@ -118,6 +118,8 @@ serve(async (req) => {
       .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
     const livekitToken = `${header}.${payloadB64}.${sigB64}`;
+
+    console.log(`[LiveKitToken] ✅ Token generated for ${isPublisher ? "publisher" : "viewer"} "${participantName}" in room "${roomName}" (user: ${userId.substring(0, 8)}…)`);
 
     return new Response(
       JSON.stringify({ token: livekitToken, url: livekitUrl }),
