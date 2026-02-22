@@ -140,7 +140,6 @@ subprojects {
         tasks.withType(JavaCompile).configureEach {
             sourceCompatibility = JavaVersion.VERSION_17
             targetCompatibility = JavaVersion.VERSION_17
-            options.release.set(17)
         }
     }
 }
