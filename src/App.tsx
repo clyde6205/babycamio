@@ -32,6 +32,7 @@ const Milestones = lazy(() => import("./pages/Milestones"));
 const CaregiverMode = lazy(() => import("./pages/CaregiverMode"));
 const InstallApp = lazy(() => import("./pages/InstallApp"));
 const Diagnostics = lazy(() => import("./pages/Diagnostics"));
+const ExternalCameras = lazy(() => import("./pages/ExternalCameras"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -103,6 +104,7 @@ const App = () => {
               <Route path="/camera/:roomName" element={<SafePage scope="Camera"><CameraView /></SafePage>} />
               <Route path="/viewer/:roomName" element={<SafePage scope="Viewer"><ViewerView /></SafePage>} />
               <Route path="/diagnostics" element={<SafePage scope="Diagnostics"><Diagnostics /></SafePage>} />
+              <Route path="/external-cameras" element={<SafePage scope="ExternalCameras"><ExternalCameras /></SafePage>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

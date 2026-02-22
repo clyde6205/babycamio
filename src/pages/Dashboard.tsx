@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield, Ruler, Crosshair, Bot, Film, Moon, Heart, Gift, BatteryCharging, Users, Baby, Star, UserPlus, Download, Share2, Activity, Smartphone } from "lucide-react";
+import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield, Ruler, Crosshair, Bot, Film, Moon, Heart, Gift, BatteryCharging, Users, Baby, Star, UserPlus, Download, Share2, Activity, Smartphone, Cctv } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
@@ -276,6 +276,10 @@ const Dashboard = () => {
           <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/diagnostics")}>
             <Activity className="h-6 w-6 text-primary" />
             <span className="text-xs font-medium text-center">Diagnostics</span>
+          </Card>
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors border-primary/30 bg-primary/5" onClick={() => navigate("/external-cameras")}>
+            <Cctv className="h-6 w-6 text-primary" />
+            <span className="text-xs font-medium text-center">CCTV</span>
           </Card>
         </div>
 
