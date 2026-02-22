@@ -104,7 +104,6 @@ const App = () => {
               <Route path="/viewer/:roomName" element={<SafePage scope="Viewer"><ViewerView /></SafePage>} />
               <Route path="/diagnostics" element={<SafePage scope="Diagnostics"><Diagnostics /></SafePage>} />
               <Route path="*" element={<NotFound />} />
-              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </BrowserRouter>
