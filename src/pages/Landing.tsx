@@ -8,7 +8,7 @@ import heroImage from "@/assets/babycam-hero.webp";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import CopyrightFooter from "@/components/CopyrightFooter";
 
-const APP_URL = "https://babycamio.lovable.app";
+const APP_URL = "https://babycamio.lovable.app"; // install link
 
 const TESTIMONIALS = [
   { name: "Sarah M.", country: "🇺🇸 USA", stars: 5, text: "Finally a baby monitor that works on our terrible rural Wi-Fi. Audio fallback is a lifesaver at 2AM." },
