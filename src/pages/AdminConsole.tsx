@@ -11,7 +11,7 @@ import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Video, ArrowLeft, Users, MonitorPlay, CreditCard, Loader2, Shield,
-  Search, AlertTriangle, Activity, Save, Settings as SettingsIcon,
+  Search, AlertTriangle, Activity, Save, Settings as SettingsIcon, Gift, CheckCircle2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -34,6 +34,8 @@ const AdminConsole = () => {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [rooms, setRooms] = useState<RoomRow[]>([]);
   const [subscriptions, setSubscriptions] = useState<SubRow[]>([]);
+  const [referrals, setReferrals] = useState<any[]>([]);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [stats, setStats] = useState({ users: 0, rooms: 0, activeRooms: 0, proUsers: 0 });
 
   // Global motion settings (admin editable)
@@ -71,6 +73,7 @@ const AdminConsole = () => {
           setStats(data.stats || { users: 0, rooms: 0, activeRooms: 0, proUsers: 0 });
           if (data.motionSettings) setGlobalMotion(data.motionSettings);
           if (data.userCameraSettings) setUserCameraSettings(data.userCameraSettings);
+          if (data.referrals) setReferrals(data.referrals);
         }
       } catch (err: any) {
         toast({ title: "Error loading data", description: err.message, variant: "destructive" });
@@ -91,6 +94,24 @@ const AdminConsole = () => {
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally { setSavingGlobal(false); }
+  };
+
+  const verifyReferral = async (referralId: string) => {
+    setVerifyingId(referralId);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-referral", {
+        body: { referral_id: referralId },
+      });
+      if (error) throw error;
+      toast({ title: "Referral Verified!", description: data.message });
+      setReferrals((prev) =>
+        prev.map((r) => r.id === referralId ? { ...r, status: "rewarded", completed_at: new Date().toISOString() } : r)
+      );
+    } catch (err: any) {
+      toast({ title: "Error verifying referral", description: err.message, variant: "destructive" });
+    } finally {
+      setVerifyingId(null);
+    }
   };
 
   const updateUserCameraSetting = async (userId: string, field: string, value: any) => {
@@ -176,6 +197,9 @@ const AdminConsole = () => {
             <TabsTrigger value="subs">{t("admin.subscriptions")} ({subscriptions.length})</TabsTrigger>
             <TabsTrigger value="camera">
               <Activity className="h-3.5 w-3.5 mr-1" /> User Cameras
+            </TabsTrigger>
+            <TabsTrigger value="referrals">
+              <Gift className="h-3.5 w-3.5 mr-1" /> Referrals ({referrals.length})
             </TabsTrigger>
           </TabsList>
 
@@ -394,6 +418,64 @@ const AdminConsole = () => {
                 </Card>
               ))}
               {subscriptions.length === 0 && <p className="py-8 text-center text-muted-foreground">{t("admin.noSubscriptions")}</p>}
+            </div>
+          </TabsContent>
+
+          {/* REFERRALS */}
+          <TabsContent value="referrals">
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground mb-2">
+                Verify referrals to grant both referrer and referred user <strong>2 months free Pro</strong>. If already Pro, their subscription is extended by 2 months.
+              </p>
+              {referrals.length === 0 && (
+                <p className="py-8 text-center text-muted-foreground">No referrals yet.</p>
+              )}
+              {referrals.map((r: any) => {
+                const referrerProfile = profiles.find((p: any) => p.user_id === r.referrer_id);
+                const isRewarded = r.status === "rewarded";
+                const isPending = r.status === "pending";
+                return (
+                  <Card key={r.id} className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Gift className="h-4 w-4 text-yellow-500" />
+                        <span className="font-mono text-sm font-bold">{r.referral_code}</span>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        isRewarded
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : isPending
+                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                          : "bg-muted text-muted-foreground"
+                      }`}>
+                        {r.status.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <p>Referrer: {referrerProfile?.display_name || r.referrer_id.slice(0, 12) + "..."}</p>
+                      {r.referred_email && <p>Referred: {r.referred_email}</p>}
+                      {r.referred_user_id && <p>Referred User: {r.referred_user_id.slice(0, 12)}...</p>}
+                      <p>Created: {new Date(r.created_at).toLocaleDateString()}</p>
+                      {r.completed_at && <p>Completed: {new Date(r.completed_at).toLocaleDateString()}</p>}
+                    </div>
+                    {!isRewarded && (
+                      <Button
+                        size="sm"
+                        className="mt-3 w-full"
+                        onClick={() => verifyReferral(r.id)}
+                        disabled={verifyingId === r.id}
+                      >
+                        {verifyingId === r.id ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                        )}
+                        Verify & Grant 2 Months Pro
+                      </Button>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
           </TabsContent>
         </Tabs>

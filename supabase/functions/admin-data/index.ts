@@ -86,12 +86,13 @@ serve(async (req) => {
     }
 
     // Default: fetch all data
-    const [profilesRes, roomsRes, subsRes, motionRes, userCameraRes] = await Promise.all([
+    const [profilesRes, roomsRes, subsRes, motionRes, userCameraRes, referralsRes] = await Promise.all([
       supabase.from("profiles").select("*").order("created_at", { ascending: false }).limit(500),
       supabase.from("rooms").select("*").order("created_at", { ascending: false }).limit(500),
       supabase.from("subscriptions").select("*").order("created_at", { ascending: false }).limit(500),
       supabase.from("app_settings").select("setting_value").eq("setting_key", "motion_recording").single(),
       supabase.from("user_camera_settings").select("*").order("updated_at", { ascending: false }).limit(500),
+      supabase.from("referrals").select("*").order("created_at", { ascending: false }).limit(500),
     ]);
 
     const profiles = profilesRes.data || [];
@@ -113,6 +114,7 @@ serve(async (req) => {
         stats,
         motionSettings: motionRes.data?.setting_value || null,
         userCameraSettings: userCameraRes.data || [],
+        referrals: referralsRes.data || [],
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
