@@ -133,6 +133,17 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "   ✅ Android platform ready`n" -ForegroundColor Green
 
+# ── Step 5b: Patch capacitor.config.ts for production (use local assets, not remote URL) ──
+Write-Host "🔧 Patching capacitor.config.ts for production build..." -ForegroundColor Yellow
+$capConfig = "capacitor.config.ts"
+if (Test-Path $capConfig) {
+    $content = Get-Content $capConfig -Raw
+    # Remove the server.url line so the app loads from local dist/ files
+    $content = $content -replace "(?m)^\s*url:.*lovableproject\.com.*,?\s*\r?\n", ""
+    Set-Content $capConfig $content -NoNewline
+    Write-Host "   ✅ Removed remote server URL — APK will use local assets" -ForegroundColor Green
+}
+
 # ── Step 6: Sync web assets to Android ──
 Write-Host "🔄 Syncing web app to Android..." -ForegroundColor Yellow
 npx cap sync android
