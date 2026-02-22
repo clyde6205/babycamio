@@ -125,24 +125,54 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "   ✅ Synced`n" -ForegroundColor Green
 
-# ── Step 6b: Patch Java compatibility to 17 ──
-Write-Host "🔧 Patching Java compatibility..." -ForegroundColor Yellow
+# ── Step 6b: Force Java 17 for ALL subprojects (nuclear fix) ──
+Write-Host "🔧 Forcing Java 17 compatibility..." -ForegroundColor Yellow
 
-# Patch ALL build.gradle and build.gradle.kts files recursively
-Get-ChildItem -Path "android" -Recurse -Include "build.gradle","build.gradle.kts" | ForEach-Object {
+# Inject into the ROOT build.gradle to force Java 17 on ALL subprojects (including capacitor-android)
+$rootGradle = "android\build.gradle"
+$rootContent = Get-Content $rootGradle -Raw
+if ($rootContent -notmatch 'FORCE_JAVA_17_PATCH') {
+    $patch = @"
+
+// FORCE_JAVA_17_PATCH - auto-injected
+subprojects {
+    afterEvaluate {
+        tasks.withType(JavaCompile).configureEach {
+            sourceCompatibility = JavaVersion.VERSION_17
+            targetCompatibility = JavaVersion.VERSION_17
+            options.release.set(17)
+        }
+    }
+}
+"@
+    Add-Content $rootGradle $patch
+    Write-Host "   📝 Injected Java 17 override into root build.gradle" -ForegroundColor Gray
+}
+
+# Also patch individual files as backup (handles Kotlin DSL jvmTarget etc.)
+Get-ChildItem -Path "android" -Recurse -Filter "*.gradle" | ForEach-Object {
     $content = Get-Content $_.FullName -Raw
-    $patched = $content -replace 'JavaVersion\.VERSION_21', 'JavaVersion.VERSION_17' `
+    $patched = $content -replace 'JavaVersion\.VERSION_2[0-9]', 'JavaVersion.VERSION_17' `
                         -replace 'JavaVersion\.VERSION_19', 'JavaVersion.VERSION_17' `
-                        -replace 'JavaVersion\.VERSION_20', 'JavaVersion.VERSION_17' `
-                        -replace 'jvmTarget\s*=\s*"21"', 'jvmTarget = "17"' `
-                        -replace 'sourceCompatibility\s*=\s*JavaVersion\.VERSION_\d+', 'sourceCompatibility = JavaVersion.VERSION_17' `
-                        -replace 'targetCompatibility\s*=\s*JavaVersion\.VERSION_\d+', 'targetCompatibility = JavaVersion.VERSION_17'
+                        -replace 'jvmTarget\s*[=:]\s*[''"]2[0-9][''"]', 'jvmTarget = "17"' `
+                        -replace 'jvmTarget\s*[=:]\s*[''"]19[''"]', 'jvmTarget = "17"' `
+                        -replace "sourceCompatibility\s+JavaVersion\.VERSION_\d+", "sourceCompatibility JavaVersion.VERSION_17" `
+                        -replace "targetCompatibility\s+JavaVersion\.VERSION_\d+", "targetCompatibility JavaVersion.VERSION_17"
     if ($patched -ne $content) {
         Set-Content $_.FullName $patched
         Write-Host "   📝 Patched $($_.FullName)" -ForegroundColor Gray
     }
 }
-Write-Host "   ✅ Java 17 compatibility applied`n" -ForegroundColor Green
+Get-ChildItem -Path "android" -Recurse -Filter "*.gradle.kts" | ForEach-Object {
+    $content = Get-Content $_.FullName -Raw
+    $patched = $content -replace 'JavaVersion\.VERSION_2[0-9]', 'JavaVersion.VERSION_17' `
+                        -replace 'jvmTarget\.set\s*\(\s*"2[0-9]"\s*\)', 'jvmTarget.set("17")'
+    if ($patched -ne $content) {
+        Set-Content $_.FullName $patched
+        Write-Host "   📝 Patched $($_.FullName)" -ForegroundColor Gray
+    }
+}
+Write-Host "   ✅ Java 17 forced on all modules`n" -ForegroundColor Green
 
 # ── Step 7: Build the APK ──
 Write-Host "🏗️  Building APK (this takes 2-5 minutes on first run)..." -ForegroundColor Yellow
