@@ -1,0 +1,2 @@
+ALTER TABLE public.rooms DROP CONSTRAINT rooms_room_type_check;
+ALTER TABLE public.rooms ADD CONSTRAINT rooms_room_type_check CHECK (room_type = ANY (ARRAY['baby'::text, 'home'::text, 'security'::text, 'cctv'::text]));
