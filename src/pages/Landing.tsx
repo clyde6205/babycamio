@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Shield, Video, Wifi, WifiOff, Volume2, Bell, Star, Download, CheckCircle2, Globe, Copy, Smartphone, Zap, Eye, MonitorSmartphone } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
-import heroImage from "@/assets/babycam-hero-lite.jpg";
+import heroImage from "@/assets/babycam-hero-optimized.webp";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import CopyrightFooter from "@/components/CopyrightFooter";
 import { AnimateOnScroll } from "@/hooks/use-scroll-animate";
@@ -65,23 +65,17 @@ const Landing = () => {
       {/* Hero */}
       <section className="px-5 pt-8 pb-6 md:px-8 md:pt-16">
         <div className="mx-auto max-w-5xl">
-          <div className="relative mb-8 overflow-hidden rounded-2xl shadow-2xl">
+          <div className="mb-8 overflow-hidden rounded-2xl shadow-2xl">
             <img
               src={heroImage}
               alt="BabyCam.io Professional Monitoring Solutions — baby monitoring, home security, and vehicle surveillance"
               className="w-full h-auto"
-              width={1024}
-              height={576}
+              width={1456}
+              height={816}
               loading="eager"
               decoding="async"
               fetchPriority="high"
             />
-            <div className="absolute inset-0 flex flex-col items-center justify-end pb-6 bg-gradient-to-t from-black/60 via-transparent to-transparent">
-              <h2 className="text-2xl md:text-4xl font-extrabold text-white drop-shadow-lg tracking-tight">
-                Baby<span className="text-blue-400">Cam</span>.io
-              </h2>
-              <p className="text-xs md:text-sm text-white/80 tracking-widest mt-1">Professional Monitoring Solutions</p>
-            </div>
           </div>
           <h1 className="mb-4 text-3xl font-extrabold leading-tight tracking-tight md:text-5xl lg:text-6xl">
             {t("landing.heroTitle")} <span className="text-brand-gradient">{t("landing.heroTitleSub")}</span>
