@@ -177,7 +177,7 @@ try {
         if ($LASTEXITCODE -eq 0) {
             Write-Host "✅ Installed on your phone!" -ForegroundColor Green
             Write-Host "🚀 Launching BabyCam.io..." -ForegroundColor Cyan
-            adb shell am start -n "app.lovable.1b7444d59ac1487f9e86e1b166f05b65/.MainActivity"
+            adb shell am start -n "io.babycam.app/.MainActivity"
             Write-Host "`n🍼 BabyCam.io is running on your phone!" -ForegroundColor Green
         } else {
             Write-Host "⚠️  Install failed. Try manually:" -ForegroundColor Yellow
