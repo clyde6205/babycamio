@@ -43,6 +43,7 @@ const CameraView = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [cameraActive, setCameraActive] = useState(false); // true as soon as getUserMedia succeeds
   const [displayName, setDisplayName] = useState("Camera");
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerRef = useRef<number | null>(null);
@@ -491,7 +492,7 @@ const CameraView = () => {
             <p className="text-sm text-white/50">{t("camera.lowBandwidth")}</p>
           </div>
         )}
-        {!isConnected && !isReconnecting && (
+        {!isConnected && !isReconnecting && !cameraActive && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 brand-gradient">
             <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-[hsl(213,80%,70%)]/30 bg-white/5">
               <Video className="h-12 w-12 text-[hsl(213,80%,70%)]" />
@@ -505,27 +506,23 @@ const CameraView = () => {
             {error && (<div className="rounded-lg bg-red-500/20 px-4 py-2 text-center"><p className="text-sm text-red-300">{error}</p></div>)}
             <Button size="lg" onClick={async () => {
               if (error) { retry(); return; }
-              // CRITICAL: getUserMedia MUST be the first thing in the direct onClick handler
-              // Android WebView loses gesture context if this is inside a useCallback/hook
               try {
                 console.log("[CameraView] Acquiring camera in direct click handler…");
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 console.log("[CameraView] ✅ Camera acquired! Showing local preview…");
-                // Show local preview IMMEDIATELY
                 if (videoRef.current) {
                   videoRef.current.srcObject = stream;
                 }
-                // Then connect to LiveKit with this stream
+                setCameraActive(true);
                 connect(stream);
               } catch (e: any) {
                 console.error("[CameraView] getUserMedia failed:", e.message);
-                // Try video only
                 try {
                   const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
                   if (videoRef.current) videoRef.current.srcObject = stream;
+                  setCameraActive(true);
                   connect(stream);
                 } catch {
-                  // Fall through to connect without stream
                   connect();
                 }
               }
@@ -538,6 +535,30 @@ const CameraView = () => {
             </Button>
           </div>
         )}
+        {/* Connecting overlay — camera is active but LiveKit still connecting */}
+        {cameraActive && !isConnected && !isReconnecting && (
+          <div className="absolute bottom-20 left-0 right-0 z-20 flex justify-center">
+            <div className="rounded-xl bg-black/70 backdrop-blur-sm px-4 py-3 text-center max-w-xs">
+              {isConnecting && (
+                <div className="flex items-center gap-2 text-white">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Connecting to stream server…</span>
+                </div>
+              )}
+              {error && (
+                <div className="text-center">
+                  <p className="text-sm text-red-300 mb-2">{error}</p>
+                  <Button size="sm" variant="outline" onClick={() => retry()} className="text-white border-white/30">
+                    <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                  </Button>
+                </div>
+              )}
+              {!isConnecting && !error && (
+                <p className="text-sm text-yellow-300">Camera active — waiting for stream…</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Offline Warning Banner */}
@@ -548,7 +569,7 @@ const CameraView = () => {
         </div>
       )}
 
-      {isConnected && (
+      {(isConnected || cameraActive) && (
         <div className="safe-bottom bg-gradient-to-t from-black/90 to-transparent px-6 pb-4 pt-6">
           <div className="flex items-center justify-center gap-5">
             <button onClick={toggleVideo} className="touch-target flex flex-col items-center gap-1.5">
