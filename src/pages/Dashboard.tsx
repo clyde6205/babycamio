@@ -36,6 +36,8 @@ const Dashboard = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [showJoin, setShowJoin] = useState(false);
   const { isPro } = useSubscription();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -117,7 +119,12 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  // Never block the dashboard — show content even without auth
+  const handleJoinRoom = () => {
+    const code = joinCode.trim();
+    if (!code) return;
+    // Navigate directly to viewer with the room code
+    navigate(`/viewer/${code}`);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -156,10 +163,34 @@ const Dashboard = () => {
             <h1 className="text-2xl font-bold">{t("dashboard.myRooms")}</h1>
             <p className="text-sm text-muted-foreground">{t("dashboard.manageRooms")}</p>
           </div>
-          <Button size="sm" onClick={() => setShowCreate(!showCreate)} className="touch-target">
-            <Plus className="mr-1 h-4 w-4" /> {t("dashboard.newRoom")}
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => setShowCreate(!showCreate)} className="touch-target">
+              <Plus className="mr-1 h-4 w-4" /> {t("dashboard.newRoom")}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowJoin(!showJoin)} className="touch-target">
+              <Eye className="mr-1 h-4 w-4" /> Join Room
+            </Button>
+          </div>
         </div>
+
+        {/* Join existing room by code */}
+        {showJoin && (
+          <Card className="mb-6 p-4">
+            <p className="text-sm text-muted-foreground mb-2">Enter a room code to watch a camera shared with you:</p>
+            <div className="flex gap-2">
+              <Input
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value)}
+                placeholder="e.g. nursery-abc123"
+                className="touch-target"
+                onKeyDown={(e) => e.key === "Enter" && handleJoinRoom()}
+              />
+              <Button onClick={handleJoinRoom} className="touch-target">
+                <Eye className="h-4 w-4 mr-1" /> Watch
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {showCreate && (
           <Card className="mb-6 p-4">
