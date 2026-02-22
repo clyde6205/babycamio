@@ -1,6 +1,7 @@
 # ============================================================
-# BabyCam.io — FULL Android APK Build Script
-# Paste this ENTIRE script into Tabby / PowerShell and hit Enter
+# BabyCam.io — FULL Android APK Build Script (PowerShell)
+# Paste this ENTIRE script into Tabby PowerShell and hit Enter
+# Repo: https://github.com/clyde6205/babycamio.git
 # ============================================================
 
 Write-Host "`n🍼 BabyCam.io — Full Android Build" -ForegroundColor Cyan
