@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.1b7444d59ac1487f9e86e1b166f05b65',
+  appId: 'io.babycam.app',
   appName: 'BabyCam.io',
   webDir: 'dist',
   server: {
