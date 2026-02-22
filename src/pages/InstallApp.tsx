@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Video, Download, Smartphone, CheckCircle2, ArrowLeft, Copy } from "lucide-react";
+import { Video, Download, Smartphone, CheckCircle2, ArrowLeft, Copy, MessageSquare } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 
@@ -162,6 +162,18 @@ const InstallApp = () => {
                   Share Link
                 </Button>
               )}
+              <Button
+                variant="outline"
+                className="w-full border-white/20 text-primary-foreground"
+                onClick={() => {
+                  const smsBody = encodeURIComponent(
+                    `Hey! Check out BabyCam.io - a free professional baby monitor app. Install it here: ${APP_URL}`
+                  );
+                  window.open(`sms:?body=${smsBody}`, "_self");
+                }}
+              >
+                <MessageSquare className="h-4 w-4 mr-2" /> Send via SMS
+              </Button>
             </Card>
           </>
         )}

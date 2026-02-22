@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Share2, Loader2, Copy, Check, Trash2, UserPlus } from "lucide-react";
+import { Share2, Loader2, Copy, Check, Trash2, UserPlus, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface SharedUser {
@@ -202,6 +202,43 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
               </div>
             )}
           </div>
+
+          {/* Share via SMS */}
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Share via SMS
+            </Label>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                const viewerUrl = `https://babycamio.lovable.app/viewer/${roomName}`;
+                const smsBody = encodeURIComponent(
+                  `Hey! I'm sharing my BabyCam room "${friendlyName}" with you. Watch live here: ${viewerUrl}\n\nDownload the app: https://babycamio.lovable.app/install`
+                );
+                window.open(`sms:?body=${smsBody}`, "_self");
+              }}
+            >
+              <MessageSquare className="h-4 w-4 mr-2" /> Send via SMS
+            </Button>
+          </div>
+
+          {/* Native Share */}
+          {typeof navigator.share === "function" && (
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={() => {
+                navigator.share({
+                  title: `BabyCam - ${friendlyName}`,
+                  text: `Watch my baby camera "${friendlyName}" live on BabyCam.io!`,
+                  url: `https://babycamio.lovable.app/viewer/${roomName}`,
+                }).catch(() => {});
+              }}
+            >
+              <Share2 className="h-4 w-4 mr-2" /> Share via Apps
+            </Button>
+          )}
 
           <div className="rounded-lg bg-muted/50 p-3">
             <p className="text-xs text-muted-foreground">
