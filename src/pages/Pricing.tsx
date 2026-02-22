@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Video, Check, ArrowLeft, Crown, Zap, Globe, Shield, Headphones, Coins } from "lucide-react";
+import { Video, Check, ArrowLeft, Crown, Zap, Globe, Shield, Headphones, Coins, MessageSquare } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
@@ -179,6 +179,58 @@ const Pricing = () => {
             )}
           </Card>
         </div>
+
+        {/* SMS Sharing Add-on */}
+        <Card className="mt-6 relative overflow-hidden border-white/10 bg-white/5 p-6 text-primary-foreground backdrop-blur-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/20 shrink-0">
+                <MessageSquare className="h-6 w-6 text-green-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  Worldwide SMS Sharing
+                  <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-[10px] font-bold text-green-400 uppercase">Add-on</span>
+                </h3>
+                <p className="text-sm text-primary-foreground/50 mt-0.5">
+                  Send recordings, photos & special moments via SMS to any phone number worldwide
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {[
+                    "Send to any phone number globally",
+                    "Share recordings & live camera links",
+                    "Editable messages before sending",
+                    "Powered by Twilio — reliable delivery",
+                  ].map((f, i) => (
+                    <li key={i} className="flex items-center gap-2 text-xs text-primary-foreground/60">
+                      <Check className="h-3 w-3 text-green-400" /> {f}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="text-center sm:text-right shrink-0">
+              <div className="mb-2">
+                <span className="text-3xl font-extrabold">$3.97</span>
+                <span className="text-primary-foreground/50 text-sm">/mo</span>
+              </div>
+              <Button
+                className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold touch-target px-6"
+                onClick={() => handleSubscribe("sms_sharing")}
+                disabled={processing}
+              >
+                {selectedProvider === "sms_sharing" ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Processing...
+                  </span>
+                ) : (
+                  "Add SMS Sharing"
+                )}
+              </Button>
+              <p className="text-[10px] text-primary-foreground/40 mt-1">Cancel anytime</p>
+            </div>
+          </div>
+        </Card>
 
         <div className="mt-12 grid grid-cols-3 gap-4 text-center">
           {[
