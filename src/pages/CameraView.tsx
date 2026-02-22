@@ -57,19 +57,20 @@ const CameraView = () => {
   const countdownRef = useRef<number | null>(null);
 
   const { user: autoUser, loading: authLoading } = useAutoAuth();
+  const userId = autoUser?.id || null;
   const { isPro } = useSubscription();
   const storageLimitBytes = isPro ? 10 * 1024 * 1024 * 1024 : 500 * 1024 * 1024;
 
   useEffect(() => {
     const loadSettings = async () => {
-      if (autoUser) {
-        const { data } = await supabase.from("profiles").select("display_name").eq("user_id", autoUser.id).single();
+      if (userId) {
+        const { data } = await supabase.from("profiles").select("display_name").eq("user_id", userId).single();
         if (data?.display_name) setDisplayName(data.display_name);
 
         const { data: userSettings } = await supabase
           .from("user_camera_settings")
           .select("*")
-          .eq("user_id", autoUser.id)
+          .eq("user_id", userId)
           .single();
 
         if (userSettings) {
@@ -87,7 +88,7 @@ const CameraView = () => {
       const global = globalSettings?.setting_value as any;
       if (global) {
         setMaxDurationMin(global.max_duration_minutes || 60);
-        if (!autoUser) {
+      if (!userId) {
           setRecordingDurationMin(global.default_duration_minutes || 5);
           setMotionSensitivity(global.motion_sensitivity || 25);
           setMotionMinPercent(global.motion_min_percent || 1.5);
@@ -95,7 +96,7 @@ const CameraView = () => {
       }
     };
     loadSettings();
-  }, [autoUser]);
+  }, [userId]);
 
   const { room, connectionState, networkQuality, isConnecting, error, connect, disconnect, retry, audioOnly } = useLiveKit({
     roomName: roomName || "", participantName: displayName, isPublisher: true,
@@ -114,9 +115,9 @@ const CameraView = () => {
     room.localParticipant.publishData(encoder.encode(payload), { reliable: true });
 
     // Log sleep event for analytics
-    if (autoUser) {
+    if (userId) {
       supabase.from("sleep_events").insert({
-        user_id: autoUser.id,
+        user_id: userId,
         room_name: roomName || "",
         event_type: "motion",
         intensity: motionLevel,
@@ -124,7 +125,7 @@ const CameraView = () => {
     }
 
     // Trigger AI cry detection
-    if (autoUser && motionLevel > 3) {
+    if (userId && motionLevel > 3) {
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (!session) return;
@@ -149,7 +150,7 @@ const CameraView = () => {
 
             // Log cry event
             supabase.from("sleep_events").insert({
-              user_id: autoUser.id,
+              user_id: userId!,
               room_name: roomName || "",
               event_type: "cry",
               intensity: result.confidence || 0.8,
@@ -164,7 +165,7 @@ const CameraView = () => {
                 apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
               },
               body: JSON.stringify({
-                userId: autoUser.id,
+                userId: userId,
                 roomName: roomName || "",
                 alertType: "cry",
                 message: `Baby is ${result.classification} in ${roomName?.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")}`,
@@ -192,15 +193,18 @@ const CameraView = () => {
         const ext = mimeType.includes("webm") ? "webm" : "mp4";
         const ts = new Date().toISOString().replace(/[:.]/g, "-");
         const fileName = `babycam-motion-${ts}.${ext}`;
-        const filePath = `${autoUser!.id}/${fileName}`;
+        const filePath = `${userId || "anonymous"}/${fileName}`;
         const sizeMB = (blob.size / 1024 / 1024).toFixed(1);
 
         // Check storage usage before uploading
-        const { data: usageData } = await supabase
-          .from("recordings")
-          .select("file_size_bytes")
-          .eq("user_id", autoUser!.id);
-        const currentUsage = (usageData || []).reduce((sum, r) => sum + (r.file_size_bytes || 0), 0);
+        let currentUsage = 0;
+        if (userId) {
+          const { data: usageData } = await supabase
+            .from("recordings")
+            .select("file_size_bytes")
+            .eq("user_id", userId);
+          currentUsage = (usageData || []).reduce((sum, r) => sum + (r.file_size_bytes || 0), 0);
+        }
 
         if (currentUsage + blob.size > storageLimitBytes) {
           // Over limit — fallback to local download
@@ -232,16 +236,18 @@ const CameraView = () => {
         }
 
         // Save metadata
-        const elapsed = recordingDurationMin * 60 - recordingTimeLeft;
-        await supabase.from("recordings").insert({
-          user_id: autoUser!.id,
-          room_name: roomName || "",
-          file_path: filePath,
-          file_size_bytes: blob.size,
-          duration_seconds: elapsed > 0 ? elapsed : recordingDurationMin * 60,
-          mime_type: mimeType,
-          trigger_type: "motion",
-        });
+        if (userId) {
+          const elapsed = recordingDurationMin * 60 - recordingTimeLeft;
+          await supabase.from("recordings").insert({
+            user_id: userId,
+            room_name: roomName || "",
+            file_path: filePath,
+            file_size_bytes: blob.size,
+            duration_seconds: elapsed > 0 ? elapsed : recordingDurationMin * 60,
+            mime_type: mimeType,
+            trigger_type: "motion",
+          });
+        }
 
         toast({ title: "Recording saved ☁️", description: `${sizeMB} MB uploaded to cloud` });
       };

@@ -3,8 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
 /**
- * Auto-authenticates the user. If no session exists, signs in anonymously.
- * Returns the user once authenticated (never null after loading).
+ * Checks for an existing session. Never blocks the app — if no session exists,
+ * loading completes with user=null so pages can still function.
  */
 export function useAutoAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -14,18 +14,13 @@ export function useAutoAuth() {
     let mounted = true;
 
     const init = async () => {
-      // Check existing session
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (session?.user) {
-        if (mounted) { setUser(session.user); setLoading(false); }
-        return;
-      }
-
-      // No session — sign in anonymously
-      const { data, error } = await supabase.auth.signInAnonymously();
-      if (!error && data.user && mounted) {
-        setUser(data.user);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user && mounted) {
+          setUser(session.user);
+        }
+      } catch {
+        // No session, that's fine
       }
       if (mounted) setLoading(false);
     };
