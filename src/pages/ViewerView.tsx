@@ -196,7 +196,7 @@ const ViewerView = () => {
               <p className="text-sm text-white/50">{t("viewer.connectToView")}</p>
             </div>
             {error && (<div className="rounded-lg bg-red-500/20 px-4 py-2 text-center"><p className="text-sm text-red-300">{error}</p></div>)}
-            <Button size="lg" onClick={error ? retry : connect} disabled={isConnecting} className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target">
+            <Button size="lg" onClick={() => error ? retry() : connect()} disabled={isConnecting} className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target">
               {isConnecting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : error ? <RefreshCw className="mr-2 h-5 w-5" /> : <Eye className="mr-2 h-5 w-5" />}
               {isConnecting ? t("camera.connecting") : error ? t("camera.retry") : t("viewer.watchLive")}
             </Button>

@@ -414,7 +414,33 @@ const CameraView = () => {
               </p>
             </div>
             {error && (<div className="rounded-lg bg-red-500/20 px-4 py-2 text-center"><p className="text-sm text-red-300">{error}</p></div>)}
-            <Button size="lg" onClick={error ? retry : connect} disabled={isConnecting} className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target">
+            <Button size="lg" onClick={async () => {
+              if (error) { retry(); return; }
+              // CRITICAL: getUserMedia MUST be the first thing in the direct onClick handler
+              // Android WebView loses gesture context if this is inside a useCallback/hook
+              try {
+                console.log("[CameraView] Acquiring camera in direct click handler…");
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                console.log("[CameraView] ✅ Camera acquired! Showing local preview…");
+                // Show local preview IMMEDIATELY
+                if (videoRef.current) {
+                  videoRef.current.srcObject = stream;
+                }
+                // Then connect to LiveKit with this stream
+                connect(stream);
+              } catch (e: any) {
+                console.error("[CameraView] getUserMedia failed:", e.message);
+                // Try video only
+                try {
+                  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                  if (videoRef.current) videoRef.current.srcObject = stream;
+                  connect(stream);
+                } catch {
+                  // Fall through to connect without stream
+                  connect();
+                }
+              }
+            }} disabled={isConnecting} className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target">
               {isConnecting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : error ? <RefreshCw className="mr-2 h-5 w-5" /> : <Video className="mr-2 h-5 w-5" />}
               {isConnecting ? t("camera.connecting") : error ? t("camera.retry") : t("camera.goLive")}
             </Button>
