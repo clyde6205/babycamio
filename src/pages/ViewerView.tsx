@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
-import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Eye, Volume2, VolumeX, Loader2, RefreshCw, Maximize2, Minimize2,
@@ -43,16 +42,19 @@ const ViewerView = () => {
   const [cryAlert, setCryAlert] = useState<string | null>(null);
   const motionTimeoutRef = useRef<number | null>(null);
 
-  const { user: autoUser, loading: authLoading } = useAutoAuth();
-
+  // Try to load user profile if logged in, but don't block viewer for unauthenticated users
   useEffect(() => {
-    if (authLoading || !autoUser) return;
     const loadProfile = async () => {
-      const { data } = await supabase.from("profiles").select("display_name").eq("user_id", autoUser.id).single();
-      if (data?.display_name) setDisplayName(data.display_name);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data } = await supabase.from("profiles").select("display_name").eq("user_id", session.user.id).single();
+        if (data?.display_name) setDisplayName(data.display_name);
+      } else {
+        setDisplayName("Viewer-" + Math.random().toString(36).substring(2, 6));
+      }
     };
     loadProfile();
-  }, [autoUser, authLoading]);
+  }, []);
 
   const { room, connectionState, networkQuality, isConnecting, error, connect, disconnect, retry, audioOnly } = useLiveKit({
     roomName: roomName || "", participantName: displayName, isPublisher: false,
