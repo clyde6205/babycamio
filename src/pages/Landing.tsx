@@ -64,8 +64,9 @@ const Landing = () => {
               className="w-full h-auto"
               width={1456}
               height={816}
-              loading="lazy"
+              loading="eager"
               decoding="async"
+              fetchPriority="high"
             />
           </div>
           <h1 className="mb-4 text-3xl font-extrabold leading-tight tracking-tight md:text-5xl lg:text-6xl">
@@ -133,6 +134,29 @@ const Landing = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Launch Video */}
+      <section className="px-5 py-12 md:px-8">
+        <div className="mx-auto max-w-4xl text-center">
+          <h2 className="text-2xl font-bold mb-2 md:text-3xl">See BabyCam.io in Action</h2>
+          <p className="text-primary-foreground/50 text-sm mb-6">Watch how easy it is to set up and start monitoring</p>
+          <div className="overflow-hidden rounded-2xl shadow-2xl border border-white/10">
+            <video
+              className="w-full h-auto"
+              controls
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              poster={heroImage}
+            >
+              <source src="/videos/babycam-launch.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
           </div>
         </div>
       </section>
