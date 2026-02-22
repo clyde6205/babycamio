@@ -81,22 +81,26 @@ $env:PATH = "$androidHome\platform-tools;$env:PATH"
 
 Write-Host "`n✅ All prerequisites met!`n" -ForegroundColor Green
 
-# ── Step 2: Clone the repo (or pull latest) ──
+# ── Step 2: Clone the repo (fresh clone every time) ──
 if (Test-Path $projectDir) {
-    Write-Host "📂 Project folder exists — pulling latest code..." -ForegroundColor Yellow
-    Push-Location $projectDir
-    git pull origin main
-    if ($LASTEXITCODE -ne 0) {
-        git pull origin master
+    Write-Host "🗑️  Removing old project folder..." -ForegroundColor Yellow
+    # Use cmd /c rd to handle Windows long path issues with node_modules
+    cmd /c "rd /s /q `"$projectDir`"" 2>$null
+    # Fallback if rd didn't fully remove it
+    if (Test-Path $projectDir) {
+        Remove-Item -Recurse -Force $projectDir -ErrorAction SilentlyContinue
     }
-    Pop-Location
-} else {
-    Write-Host "📥 Cloning your GitHub repo..." -ForegroundColor Yellow
-    git clone https://github.com/clyde6205/babycamio.git $projectDir
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Git clone failed. Make sure the repo exists and is public (or you're logged into git)." -ForegroundColor Red
-        exit 1
+    if (Test-Path $projectDir) {
+        Write-Host "⚠️  Could not fully remove old folder. Renaming it..." -ForegroundColor Yellow
+        $backupName = "$projectDir-old-$(Get-Date -Format 'HHmmss')"
+        Rename-Item $projectDir $backupName -ErrorAction SilentlyContinue
     }
+}
+Write-Host "📥 Cloning your GitHub repo..." -ForegroundColor Yellow
+git clone https://github.com/clyde6205/babycamio.git $projectDir
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Git clone failed. Make sure the repo exists and is public (or you're logged into git)." -ForegroundColor Red
+    exit 1
 }
 
 Push-Location $projectDir
