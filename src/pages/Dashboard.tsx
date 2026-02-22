@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield, Ruler, Crosshair, Bot, Film, Moon, Heart, Gift, BatteryCharging, Users, Baby, Star, UserPlus, Download, Share2, Activity } from "lucide-react";
+import { Video, Plus, Camera, Eye, LogOut, Loader2, Trash2, Copy, Check, Crown, Settings, Shield, Ruler, Crosshair, Bot, Film, Moon, Heart, Gift, BatteryCharging, Users, Baby, Star, UserPlus, Download, Share2, Activity, Smartphone } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
@@ -37,6 +37,21 @@ const Dashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const { isPro } = useSubscription();
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  // PWA install prompt listener
+  useEffect(() => {
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setIsInstalled(true);
+    }
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
 
   useEffect(() => {
     if (!localStorage.getItem("babycam_onboarded")) {
@@ -263,6 +278,29 @@ const Dashboard = () => {
             <span className="text-xs font-medium text-center">Diagnostics</span>
           </Card>
         </div>
+
+        {/* Floating Install Button */}
+        {!isInstalled && (
+          <div className="fixed bottom-6 right-6 z-50">
+            <Button
+              size="lg"
+              className="rounded-full shadow-lg shadow-primary/30 px-5 gap-2 animate-bounce"
+              onClick={async () => {
+                if (deferredPrompt) {
+                  await deferredPrompt.prompt();
+                  const { outcome } = await deferredPrompt.userChoice;
+                  if (outcome === "accepted") setIsInstalled(true);
+                  setDeferredPrompt(null);
+                } else {
+                  navigate("/install");
+                }
+              }}
+            >
+              <Smartphone className="h-5 w-5" />
+              Install App
+            </Button>
+          </div>
+        )}
       </main>
 
       <CopyrightFooter variant="dark" showLinks={false} />
