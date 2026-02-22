@@ -294,39 +294,10 @@ export const useLiveKit = ({
   }, [isPublisher]);
 
   // ── Enable devices with cascading fallbacks ──
-  // preAcquiredStream: MediaStream obtained directly from user gesture to preserve permission context
-  const enableDevices = useCallback(async (room: Room, quality: NetworkQuality, preAcquiredStream?: MediaStream) => {
+  const enableDevices = useCallback(async (room: Room, quality: NetworkQuality) => {
     if (!isPublisher) return;
 
-    // If we have a pre-acquired stream, publish its tracks directly
-    if (preAcquiredStream) {
-      try {
-        const videoTracks = preAcquiredStream.getVideoTracks();
-        const audioTracks = preAcquiredStream.getAudioTracks();
-
-        if (quality === "poor" || quality === "offline") {
-          // Stop video tracks, only use audio
-          videoTracks.forEach(t => t.stop());
-          if (audioTracks.length > 0) {
-            await room.localParticipant.setMicrophoneEnabled(true);
-          }
-          setAudioOnly(true);
-        } else {
-          // Publish both camera and mic using pre-acquired stream
-          await room.localParticipant.enableCameraAndMicrophone();
-          setAudioOnly(false);
-        }
-        // Stop pre-acquired stream tracks since LiveKit now manages its own
-        preAcquiredStream.getTracks().forEach(t => t.stop());
-      } catch (e: any) {
-        console.warn("[LiveKit] Device enable with pre-acquired stream failed:", e.message);
-        // Fallback to standard enable
-        try { await room.localParticipant.setCameraEnabled(true); } catch { /* ok */ }
-        try { await room.localParticipant.setMicrophoneEnabled(true); } catch { /* ok */ }
-        preAcquiredStream.getTracks().forEach(t => t.stop());
-      }
-      return;
-    }
+    // Standard device enable — permissions already granted by pre-acquire in connectToRoom
 
     // Fallback path (no pre-acquired stream, e.g. auto-reconnect)
     try {
@@ -457,8 +428,14 @@ export const useLiveKit = ({
       // Acquire wake lock to keep screen on (critical for baby monitor)
       await requestWakeLock();
 
-      // Enable devices — pass pre-acquired stream to preserve permission context
-      await enableDevices(room, quality, preAcquiredStream);
+      // Release pre-acquired stream BEFORE LiveKit opens the camera — avoids device lock → black screen
+      if (preAcquiredStream) {
+        console.log("[LiveKit] Releasing pre-acquired stream before LiveKit device enable");
+        preAcquiredStream.getTracks().forEach(t => t.stop());
+      }
+
+      // Enable devices — permissions already granted by pre-acquire above
+      await enableDevices(room, quality);
 
       // Start heartbeat
       startHeartbeat(room);
