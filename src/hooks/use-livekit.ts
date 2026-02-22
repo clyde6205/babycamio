@@ -11,6 +11,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 
 export type NetworkQuality = "excellent" | "good" | "fair" | "poor" | "offline";
+export type ConnectionType = "wifi" | "cellular" | "bluetooth" | "ethernet" | "unknown" | "offline";
 
 interface UseLiveKitOptions {
   roomName: string;
@@ -22,6 +23,7 @@ interface UseLiveKitReturn {
   room: Room | null;
   connectionState: ConnectionState;
   networkQuality: NetworkQuality;
+  connectionType: ConnectionType;
   isConnecting: boolean;
   error: string | null;
   connect: () => Promise<void>;
@@ -30,36 +32,78 @@ interface UseLiveKitReturn {
   audioOnly: boolean;
 }
 
-// ─── Network helpers ───────────────────────────────────────────────
+// ─── Connection type detection (WiFi / Cellular / Bluetooth / Ethernet) ────
+const getConnectionType = (): ConnectionType => {
+  if (!navigator.onLine) return "offline";
+  const nav = navigator as any;
+  if (!nav.connection) return "unknown";
+  const type = nav.connection.type;
+  // Android reports: wifi, cellular, bluetooth, ethernet, none, other, unknown
+  if (type === "wifi") return "wifi";
+  if (type === "cellular") return "cellular";
+  if (type === "bluetooth") return "bluetooth";
+  if (type === "ethernet") return "ethernet"; // USB tethering also shows as ethernet
+  return "unknown";
+};
+
+// ─── Network quality from effectiveType + connection type ──────────
 const getNetworkQuality = (): NetworkQuality => {
   if (!navigator.onLine) return "offline";
   const nav = navigator as any;
   if (!nav.connection) return "good";
-  const type = nav.connection.effectiveType;
-  if (type === "4g") return "excellent";
-  if (type === "3g") return "good";
-  if (type === "2g") return "fair";
-  if (type === "slow-2g") return "poor";
+
+  const connType = getConnectionType();
+  const effectiveType = nav.connection.effectiveType;
+  const downlink = nav.connection.downlink; // Mbps estimate
+
+  // Bluetooth tethering is typically slower — cap at "good"
+  if (connType === "bluetooth") {
+    if (downlink && downlink >= 2) return "good";
+    if (downlink && downlink >= 0.5) return "fair";
+    return "poor";
+  }
+
+  // Use effectiveType + downlink for best estimate
+  if (effectiveType === "4g" && downlink >= 5) return "excellent";
+  if (effectiveType === "4g") return "good";
+  if (effectiveType === "3g") return "good";
+  if (effectiveType === "2g") return "fair";
+  if (effectiveType === "slow-2g") return "poor";
+
+  // Fallback: use downlink speed if available
+  if (downlink !== undefined) {
+    if (downlink >= 5) return "excellent";
+    if (downlink >= 2) return "good";
+    if (downlink >= 0.5) return "fair";
+    return "poor";
+  }
+
   return "good";
 };
 
-// ─── Room options by quality ───────────────────────────────────────
-const getRoomOptions = (quality: NetworkQuality, isPublisher: boolean): RoomOptions => {
+// ─── Room options adapted per quality + connection type ────────────
+const getRoomOptions = (quality: NetworkQuality, isPublisher: boolean, connType: ConnectionType): RoomOptions => {
   const base: RoomOptions = {
     adaptiveStream: true,
     dynacast: true,
-    disconnectOnPageLeave: false, // We handle lifecycle ourselves
+    disconnectOnPageLeave: false, // We manage lifecycle manually for persistence
     reconnectPolicy: {
       nextRetryDelayInMs: (context) => {
-        // Aggressive reconnect: 300ms → 600ms → 1.2s → … max 8s, up to 30 attempts
-        const delay = Math.min(300 * Math.pow(2, context.retryCount), 8000);
-        return context.retryCount < 30 ? delay : null;
+        // Ultra-aggressive on cellular/bluetooth: 200ms start, max 5s
+        // Normal WiFi: 300ms start, max 8s
+        const isMobile = connType === "cellular" || connType === "bluetooth";
+        const baseDelay = isMobile ? 200 : 300;
+        const maxDelay = isMobile ? 5000 : 8000;
+        const maxRetries = 50; // Never give up easily
+        const delay = Math.min(baseDelay * Math.pow(1.5, context.retryCount), maxDelay);
+        return context.retryCount < maxRetries ? delay : null;
       },
     },
   };
 
   if (!isPublisher) return base;
 
+  // Quality presets for publishers
   const presets: Record<string, Partial<RoomOptions>> = {
     excellent: {
       videoCaptureDefaults: { resolution: { width: 3840, height: 2160, frameRate: 30 } },
@@ -86,16 +130,21 @@ const getRoomOptions = (quality: NetworkQuality, isPublisher: boolean): RoomOpti
       videoCaptureDefaults: { resolution: { width: 320, height: 240, frameRate: 10 } },
       publishDefaults: { videoCodec: "vp8", dtx: true, red: true },
     },
+    offline: {
+      videoCaptureDefaults: { resolution: { width: 320, height: 240, frameRate: 5 } },
+      publishDefaults: { videoCodec: "vp8", dtx: true, red: true },
+    },
   };
 
   return { ...base, ...presets[quality] || presets.poor };
 };
 
-// ─── Fetch token (never throws fatally) ────────────────────────────
-const fetchTokenFromServer = async (
+// ─── Token fetcher with retry ──────────────────────────────────────
+const fetchTokenWithRetry = async (
   roomName: string,
   participantName: string,
-  isPublisher: boolean
+  isPublisher: boolean,
+  maxRetries = 3
 ): Promise<{ token: string; url: string }> => {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   const headers: Record<string, string> = {
@@ -108,18 +157,74 @@ const fetchTokenFromServer = async (
     if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
   } catch { /* no auth */ }
 
-  const response = await fetch(
-    `https://${projectId}.supabase.co/functions/v1/livekit-token`,
-    { method: "POST", headers, body: JSON.stringify({ roomName, participantName, isPublisher }) }
-  );
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || `Token request failed (${response.status})`);
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout per attempt
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/livekit-token`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ roomName, participantName, isPublisher }),
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Token request failed (${response.status})`);
+      }
+
+      return await response.json();
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[LiveKit] Token fetch attempt ${attempt + 1}/${maxRetries} failed:`, err.message);
+      if (attempt < maxRetries - 1) {
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // 1s, 2s, 3s backoff
+      }
+    }
   }
 
-  return response.json();
+  throw lastError || new Error("Failed to get token after retries");
 };
+
+// ─── Wake Lock to keep screen/connection alive on Android ──────────
+let wakeLock: any = null;
+
+const requestWakeLock = async () => {
+  try {
+    if ("wakeLock" in navigator) {
+      wakeLock = await (navigator as any).wakeLock.request("screen");
+      console.log("[LiveKit] Wake lock acquired — screen stays on");
+      wakeLock.addEventListener("release", () => {
+        console.log("[LiveKit] Wake lock released");
+      });
+    }
+  } catch (e: any) {
+    console.warn("[LiveKit] Wake lock failed:", e.message);
+  }
+};
+
+const releaseWakeLock = () => {
+  if (wakeLock) {
+    try { wakeLock.release(); } catch { /* ok */ }
+    wakeLock = null;
+  }
+};
+
+// Re-acquire wake lock when page becomes visible again
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && wakeLock === null) {
+      // Will be re-requested by the hook if active
+    }
+  });
+}
 
 // ─── Main hook ─────────────────────────────────────────────────────
 export const useLiveKit = ({
@@ -129,6 +234,7 @@ export const useLiveKit = ({
 }: UseLiveKitOptions): UseLiveKitReturn => {
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [networkQuality, setNetworkQuality] = useState<NetworkQuality>(getNetworkQuality);
+  const [connectionType, setConnectionType] = useState<ConnectionType>(getConnectionType);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioOnly, setAudioOnly] = useState(false);
@@ -137,17 +243,45 @@ export const useLiveKit = ({
   const roomRef = useRef<Room | null>(null);
   const heartbeatRef = useRef<number | null>(null);
   const autoReconnectRef = useRef<number | null>(null);
+  const qualityCheckRef = useRef<number | null>(null);
   const intentionalDisconnect = useRef(false);
   const connectAttemptRef = useRef(0);
+  const lastQualityRef = useRef<NetworkQuality>("good");
 
-  // ── Network quality monitor ──
+  // ── Network monitor: handles WiFi ↔ Cellular ↔ Bluetooth switches ──
   useEffect(() => {
     const nav = navigator as any;
     const update = () => {
       const q = getNetworkQuality();
+      const ct = getConnectionType();
       setNetworkQuality(q);
-      if (q === "poor" && roomRef.current) setAudioOnly(true);
-      else if (q !== "poor") setAudioOnly(false);
+      setConnectionType(ct);
+
+      console.log(`[LiveKit] Network changed: ${ct} / ${q}`);
+
+      if (q === "poor" || q === "offline") {
+        setAudioOnly(true);
+      } else {
+        setAudioOnly(false);
+      }
+
+      // If quality improved significantly while connected, re-enable video
+      if (roomRef.current?.state === ConnectionState.Connected && isPublisher) {
+        const prev = lastQualityRef.current;
+        if ((prev === "poor" || prev === "offline") && (q === "good" || q === "excellent")) {
+          console.log("[LiveKit] Quality improved — re-enabling video");
+          roomRef.current.localParticipant.setCameraEnabled(true).catch(() => {});
+          setAudioOnly(false);
+        }
+        // If quality degraded, switch to audio only
+        if ((prev === "excellent" || prev === "good") && q === "poor") {
+          console.log("[LiveKit] Quality degraded — switching to audio only");
+          roomRef.current.localParticipant.setCameraEnabled(false).catch(() => {});
+          setAudioOnly(true);
+        }
+      }
+
+      lastQualityRef.current = q;
     };
 
     window.addEventListener("online", update);
@@ -159,13 +293,13 @@ export const useLiveKit = ({
       window.removeEventListener("offline", update);
       if (nav.connection) nav.connection.removeEventListener("change", update);
     };
-  }, []);
+  }, [isPublisher]);
 
-  // ── Enable devices with fallbacks ──
+  // ── Enable devices with cascading fallbacks ──
   const enableDevices = useCallback(async (room: Room, quality: NetworkQuality) => {
     if (!isPublisher) return;
     try {
-      if (quality === "poor") {
+      if (quality === "poor" || quality === "offline") {
         await room.localParticipant.setMicrophoneEnabled(true);
         setAudioOnly(true);
       } else {
@@ -173,15 +307,18 @@ export const useLiveKit = ({
         setAudioOnly(false);
       }
     } catch (e: any) {
-      console.warn("[LiveKit] Primary device enable failed, trying fallbacks:", e.message);
+      console.warn("[LiveKit] Device enable failed, trying fallbacks:", e.message);
+      // Fallback 1: try camera alone
       try { await room.localParticipant.setCameraEnabled(true); } catch { /* ok */ }
+      // Fallback 2: try mic alone
       try { await room.localParticipant.setMicrophoneEnabled(true); } catch { /* ok */ }
+      // Connection stays alive regardless
     }
   }, [isPublisher]);
 
-  // ── Core connect ──
+  // ── Core connect with full resilience ──
   const connectToRoom = useCallback(async () => {
-    if (roomRef.current?.state === ConnectionState.Connected) return; // already connected
+    if (roomRef.current?.state === ConnectionState.Connected) return;
 
     setIsConnecting(true);
     setError(null);
@@ -190,20 +327,32 @@ export const useLiveKit = ({
     const thisAttempt = connectAttemptRef.current;
 
     try {
-      const { token, url } = await fetchTokenFromServer(roomName, participantName, isPublisher);
-      const quality = getNetworkQuality();
-      setNetworkQuality(quality);
+      // Wait for network if offline
+      if (!navigator.onLine) {
+        setError("Waiting for network…");
+        setConnectionState(ConnectionState.Disconnected);
+        setIsConnecting(false);
+        // Will auto-reconnect when online event fires
+        return;
+      }
 
-      // Clean up previous room if any
+      const { token, url } = await fetchTokenWithRetry(roomName, participantName, isPublisher);
+      const quality = getNetworkQuality();
+      const connType = getConnectionType();
+      setNetworkQuality(quality);
+      setConnectionType(connType);
+      lastQualityRef.current = quality;
+
+      // Clean up previous room
       if (roomRef.current) {
         try { roomRef.current.disconnect(true); } catch { /* ok */ }
         roomRef.current = null;
       }
 
-      const room = new Room(getRoomOptions(quality, isPublisher));
+      const room = new Room(getRoomOptions(quality, isPublisher, connType));
       roomRef.current = room;
 
-      // ── Room event handlers ──
+      // ── Room events ──
       room.on(RoomEvent.ConnectionStateChanged, (state: ConnectionState) => {
         setConnectionState(state);
       });
@@ -215,9 +364,10 @@ export const useLiveKit = ({
       });
 
       room.on(RoomEvent.Reconnected, () => {
-        console.log("[LiveKit] Reconnected successfully");
+        console.log("[LiveKit] ✅ Reconnected successfully");
         setConnectionState(ConnectionState.Connected);
         setError(null);
+        connectAttemptRef.current = 0; // Reset backoff on success
       });
 
       room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
@@ -225,7 +375,6 @@ export const useLiveKit = ({
         setConnectionState(ConnectionState.Disconnected);
         setRoomInstance(null);
 
-        // Auto-reconnect unless user intentionally disconnected
         if (!intentionalDisconnect.current && thisAttempt === connectAttemptRef.current) {
           setError("Connection lost — reconnecting…");
           scheduleReconnect();
@@ -234,27 +383,34 @@ export const useLiveKit = ({
 
       room.on(RoomEvent.SignalReconnecting, () => setError(null));
 
-      // ── Connect to LiveKit server ──
-      console.log("[LiveKit] Connecting to", url, "room:", roomName);
+      // ── Connect ──
+      console.log(`[LiveKit] Connecting via ${connType} (${quality}) to ${url} room: ${roomName}`);
       await room.connect(url, token);
       console.log("[LiveKit] ✅ Connected! Room:", room.name);
 
       setConnectionState(ConnectionState.Connected);
       setRoomInstance(room);
       setError(null);
+      connectAttemptRef.current = 0; // Reset backoff on success
 
-      // Enable devices (separate from connection)
+      // Acquire wake lock to keep screen on (critical for baby monitor)
+      await requestWakeLock();
+
+      // Enable devices
       await enableDevices(room, quality);
 
-      // Start heartbeat monitor
+      // Start heartbeat
       startHeartbeat(room);
+
+      // Start periodic quality check (adapts mid-stream)
+      startQualityCheck();
+
     } catch (err: any) {
       console.error("[LiveKit] Connection failed:", err.message);
 
       if (thisAttempt === connectAttemptRef.current && !intentionalDisconnect.current) {
         setError(err.message || "Failed to connect");
         setConnectionState(ConnectionState.Disconnected);
-        // Auto-retry after delay
         scheduleReconnect();
       }
     } finally {
@@ -262,13 +418,17 @@ export const useLiveKit = ({
     }
   }, [roomName, participantName, isPublisher, enableDevices]);
 
-  // ── Schedule auto-reconnect with backoff ──
+  // ── Auto-reconnect with adaptive backoff ──
   const scheduleReconnect = useCallback(() => {
     if (intentionalDisconnect.current) return;
     if (autoReconnectRef.current) clearTimeout(autoReconnectRef.current);
 
-    const delay = Math.min(2000 * Math.pow(1.5, Math.min(connectAttemptRef.current, 10)), 30000);
-    console.log(`[LiveKit] Auto-reconnect in ${Math.round(delay / 1000)}s…`);
+    const connType = getConnectionType();
+    // Faster reconnect on cellular/bluetooth (more prone to drops)
+    const baseDelay = (connType === "cellular" || connType === "bluetooth") ? 1000 : 2000;
+    const delay = Math.min(baseDelay * Math.pow(1.3, Math.min(connectAttemptRef.current, 15)), 30000);
+
+    console.log(`[LiveKit] Auto-reconnect in ${Math.round(delay / 1000)}s (${connType})…`);
 
     autoReconnectRef.current = window.setTimeout(() => {
       if (!intentionalDisconnect.current) {
@@ -278,7 +438,7 @@ export const useLiveKit = ({
     }, delay);
   }, [connectToRoom]);
 
-  // ── Heartbeat: check room is alive every 10s ──
+  // ── Heartbeat: 5s checks for unstable connections ──
   const startHeartbeat = useCallback((room: Room) => {
     if (heartbeatRef.current) clearInterval(heartbeatRef.current);
 
@@ -288,22 +448,41 @@ export const useLiveKit = ({
         return;
       }
 
-      const state = room.state;
-      if (state === ConnectionState.Disconnected) {
-        console.warn("[LiveKit] Heartbeat detected disconnect — reconnecting");
-        scheduleReconnect();
+      if (room.state === ConnectionState.Disconnected) {
+        console.warn("[LiveKit] ❤️ Heartbeat: disconnect detected — reconnecting");
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+        scheduleReconnect();
       }
-    }, 10_000);
+    }, 5_000); // Check every 5 seconds
   }, [scheduleReconnect]);
 
-  // ── Visibility change: reconnect when app comes to foreground ──
+  // ── Periodic quality check: adapt video mid-stream ──
+  const startQualityCheck = useCallback(() => {
+    if (qualityCheckRef.current) clearInterval(qualityCheckRef.current);
+
+    qualityCheckRef.current = window.setInterval(() => {
+      if (intentionalDisconnect.current || !roomRef.current) {
+        if (qualityCheckRef.current) clearInterval(qualityCheckRef.current);
+        return;
+      }
+      const q = getNetworkQuality();
+      const ct = getConnectionType();
+      setNetworkQuality(q);
+      setConnectionType(ct);
+    }, 15_000); // Check every 15 seconds
+  }, []);
+
+  // ── Visibility: reconnect on foreground (Android app resume) ──
   useEffect(() => {
-    const handleVisibility = () => {
+    const handleVisibility = async () => {
       if (document.visibilityState === "visible" && !intentionalDisconnect.current) {
+        // Re-acquire wake lock
+        await requestWakeLock();
+
         const room = roomRef.current;
         if (!room || room.state === ConnectionState.Disconnected) {
           console.log("[LiveKit] App foregrounded — reconnecting");
+          connectAttemptRef.current = 0; // Fresh start
           connectToRoom();
         }
       }
@@ -312,14 +491,15 @@ export const useLiveKit = ({
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [connectToRoom]);
 
-  // ── Online/offline: reconnect when network returns ──
+  // ── Online event: instant reconnect on network restore ──
   useEffect(() => {
     const handleOnline = () => {
       if (!intentionalDisconnect.current) {
         const room = roomRef.current;
         if (!room || room.state !== ConnectionState.Connected) {
-          console.log("[LiveKit] Network restored — reconnecting");
-          setTimeout(() => connectToRoom(), 1000);
+          console.log("[LiveKit] 📶 Network restored — reconnecting immediately");
+          connectAttemptRef.current = 0;
+          setTimeout(() => connectToRoom(), 500); // Tiny delay for network to stabilize
         }
       }
     };
@@ -332,6 +512,8 @@ export const useLiveKit = ({
     intentionalDisconnect.current = true;
     if (autoReconnectRef.current) { clearTimeout(autoReconnectRef.current); autoReconnectRef.current = null; }
     if (heartbeatRef.current) { clearInterval(heartbeatRef.current); heartbeatRef.current = null; }
+    if (qualityCheckRef.current) { clearInterval(qualityCheckRef.current); qualityCheckRef.current = null; }
+    releaseWakeLock();
     if (roomRef.current) {
       roomRef.current.disconnect(true);
       roomRef.current = null;
@@ -348,12 +530,14 @@ export const useLiveKit = ({
     await connectToRoom();
   }, [disconnect, connectToRoom]);
 
-  // ── Cleanup on unmount ──
+  // ── Cleanup ──
   useEffect(() => {
     return () => {
       intentionalDisconnect.current = true;
       if (autoReconnectRef.current) clearTimeout(autoReconnectRef.current);
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      if (qualityCheckRef.current) clearInterval(qualityCheckRef.current);
+      releaseWakeLock();
       if (roomRef.current) {
         roomRef.current.disconnect(true);
         roomRef.current = null;
@@ -365,6 +549,7 @@ export const useLiveKit = ({
     room: roomInstance,
     connectionState,
     networkQuality,
+    connectionType,
     isConnecting,
     error,
     connect: connectToRoom,

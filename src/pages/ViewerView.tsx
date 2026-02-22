@@ -56,7 +56,7 @@ const ViewerView = () => {
     loadProfile();
   }, []);
 
-  const { room, connectionState, networkQuality, isConnecting, error, connect, disconnect, retry, audioOnly } = useLiveKit({
+  const { room, connectionState, networkQuality, connectionType, isConnecting, error, connect, disconnect, retry, audioOnly } = useLiveKit({
     roomName: roomName || "", participantName: displayName, isPublisher: false,
   });
 
