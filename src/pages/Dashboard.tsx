@@ -243,13 +243,31 @@ const Dashboard = () => {
                     </Button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" className="flex-1 touch-target" onClick={() => navigate(`/camera/${room.room_name}`)}>
-                    <Camera className="mr-1 h-4 w-4" /> {t("dashboard.startCamera")}
+                <div className="flex flex-col gap-2">
+                  {/* BIG SHARE BUTTON — the most important action */}
+                  <Button
+                    size="lg"
+                    className="w-full touch-target bg-green-600 hover:bg-green-700 text-white font-bold text-base"
+                    onClick={() => {
+                      const link = `${window.location.origin}/viewer/${room.room_name}`;
+                      if (navigator.share) {
+                        navigator.share({ title: "BabyCam", text: "Watch my baby camera live!", url: link }).catch(() => {});
+                      } else {
+                        navigator.clipboard.writeText(link);
+                        toast({ title: "Link copied!", description: link });
+                      }
+                    }}
+                  >
+                    <Share2 className="mr-2 h-5 w-5" /> Share Camera Link
                   </Button>
-                  <Button size="sm" variant="secondary" className="flex-1 touch-target" onClick={() => navigate(`/viewer/${room.room_name}`)}>
-                    <Eye className="mr-1 h-4 w-4" /> {t("dashboard.watch")}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1 touch-target" onClick={() => navigate(`/camera/${room.room_name}`)}>
+                      <Camera className="mr-1 h-4 w-4" /> {t("dashboard.startCamera")}
+                    </Button>
+                    <Button size="sm" variant="secondary" className="flex-1 touch-target" onClick={() => navigate(`/viewer/${room.room_name}`)}>
+                      <Eye className="mr-1 h-4 w-4" /> {t("dashboard.watch")}
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))}
