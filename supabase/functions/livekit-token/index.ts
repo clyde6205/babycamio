@@ -45,29 +45,24 @@ serve(async (req) => {
       });
     }
 
-    // --- Verify room ownership or shared access ---
-    const { data: room } = await supabase
-      .from("rooms")
-      .select("owner_id")
-      .eq("room_name", roomName)
-      .maybeSingle();
+    // --- Access control ---
+    // Publishers (camera phone) must own the room
+    // Viewers (watchers) can join ANY room from anywhere in the world
+    if (isPublisher === true) {
+      const { data: room } = await supabase
+        .from("rooms")
+        .select("owner_id")
+        .eq("room_name", roomName)
+        .maybeSingle();
 
-    if (room && room.owner_id !== user.id) {
-      // Check shared access
-      const { data: shared } = await supabase
-        .from("shared_access")
-        .select("id")
-        .eq("shared_with_email", user.email)
-        .eq("is_active", true)
-        .limit(1);
-
-      if (!shared || shared.length === 0) {
-        return new Response(JSON.stringify({ error: "Access denied to this room" }), {
+      if (room && room.owner_id !== user.id) {
+        return new Response(JSON.stringify({ error: "Only the room owner can broadcast" }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
+    // Viewers: no ownership check — anyone authenticated can watch from anywhere
 
     // --- Generate LiveKit JWT ---
     const apiKey = Deno.env.get("LIVEKIT_API_KEY");
