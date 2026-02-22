@@ -162,6 +162,33 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "   ✅ Synced`n" -ForegroundColor Green
 
+# ── Step 6a: Patch AndroidManifest.xml with AdMob App ID ──
+Write-Host "🔧 Patching AndroidManifest.xml for AdMob..." -ForegroundColor Yellow
+$manifestPath = "android\app\src\main\AndroidManifest.xml"
+if (Test-Path $manifestPath) {
+    $manifest = Get-Content $manifestPath -Raw
+    if ($manifest -notmatch 'com\.google\.android\.gms\.ads\.APPLICATION_ID') {
+        $adMobMeta = @'
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
+'@
+        $manifest = $manifest -replace '(</application>)', "$adMobMeta`n    `$1"
+        Set-Content $manifestPath $manifest -NoNewline
+        Write-Host "   ✅ AdMob APPLICATION_ID added to manifest" -ForegroundColor Green
+    } else {
+        Write-Host "   ✅ AdMob APPLICATION_ID already present" -ForegroundColor Green
+    }
+    
+    # Also ensure INTERNET permission is present
+    if ($manifest -notmatch 'android\.permission\.INTERNET') {
+        $manifest = Get-Content $manifestPath -Raw
+        $manifest = $manifest -replace '(<application)', '<uses-permission android:name="android.permission.INTERNET" />' + "`n    `$1"
+        Set-Content $manifestPath $manifest -NoNewline
+        Write-Host "   ✅ INTERNET permission added" -ForegroundColor Green
+    }
+}
+
 # ── Step 6b: Set JAVA_HOME for Gradle ──
 Write-Host "🔧 Ensuring Gradle uses JDK 21..." -ForegroundColor Yellow
 $gradleProps = "android\gradle.properties"
