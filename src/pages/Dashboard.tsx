@@ -209,12 +209,19 @@ const Dashboard = () => {
           </div>
         ) : rooms.length === 0 ? (
           <div className="rounded-xl border-2 border-dashed p-12 text-center">
-            <Video className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
-            <h3 className="mb-1 text-lg font-semibold">{t("dashboard.noRoomsTitle")}</h3>
-            <p className="mb-4 text-sm text-muted-foreground">{t("dashboard.noRoomsDesc")}</p>
-            <Button onClick={() => setShowCreate(true)} className="touch-target">
-              <Plus className="mr-1 h-4 w-4" /> {t("dashboard.createRoom")}
-            </Button>
+            <Eye className="mx-auto mb-3 h-12 w-12 text-primary/40" />
+            <h3 className="mb-1 text-lg font-semibold">Welcome to BabyCam.io</h3>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Join an existing camera to watch, or create a new room to start broadcasting.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button size="lg" onClick={() => setShowJoin(true)} className="touch-target">
+                <Eye className="mr-2 h-5 w-5" /> Join & Watch a Camera
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => setShowCreate(true)} className="touch-target">
+                <Plus className="mr-2 h-5 w-5" /> Set Up My Camera
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
