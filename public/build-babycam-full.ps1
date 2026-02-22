@@ -103,14 +103,16 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "   ✅ Web app built`n" -ForegroundColor Green
 
-# ── Step 5: Add Android platform if not present ──
-if (-not (Test-Path "android")) {
-    Write-Host "📱 Adding Android platform..." -ForegroundColor Yellow
-    npx cap add android
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Failed to add Android platform" -ForegroundColor Red
-        Pop-Location; exit 1
-    }
+# ── Step 5: Add Android platform (fresh each time) ──
+Write-Host "📱 Setting up Android platform..." -ForegroundColor Yellow
+if (Test-Path "android") {
+    Write-Host "   🗑️  Removing old android folder..." -ForegroundColor Yellow
+    Remove-Item -Recurse -Force "android"
+}
+npx cap add android
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Failed to add Android platform" -ForegroundColor Red
+    Pop-Location; exit 1
 }
 Write-Host "   ✅ Android platform ready`n" -ForegroundColor Green
 
