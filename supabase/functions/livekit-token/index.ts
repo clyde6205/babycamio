@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,28 +11,6 @@ serve(async (req) => {
   }
 
   try {
-    // Verify auth
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const { roomName, participantName, isPublisher } = await req.json();
 
     if (!roomName || !participantName) {
@@ -43,7 +20,6 @@ serve(async (req) => {
       });
     }
 
-    // Check LiveKit secrets
     const apiKey = Deno.env.get("LIVEKIT_API_KEY");
     const apiSecret = Deno.env.get("LIVEKIT_API_SECRET");
     const livekitUrl = Deno.env.get("LIVEKIT_URL");
@@ -61,17 +37,18 @@ serve(async (req) => {
       );
     }
 
-    // Generate a JWT token for LiveKit manually (no npm dependency needed)
+    // Generate a JWT token for LiveKit
     const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }))
       .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
     const now = Math.floor(Date.now() / 1000);
+    const participantId = crypto.randomUUID();
     const payload = {
       iss: apiKey,
-      sub: user.id,
+      sub: participantId,
       name: participantName,
       nbf: now,
-      exp: now + 86400, // 24h
+      exp: now + 86400,
       jti: crypto.randomUUID(),
       video: {
         room: roomName,

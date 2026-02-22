@@ -61,17 +61,22 @@ const CameraView = () => {
   const storageLimitBytes = isPro ? 10 * 1024 * 1024 * 1024 : 500 * 1024 * 1024;
 
   useEffect(() => {
-    if (authLoading || !autoUser) return;
-
     const loadSettings = async () => {
-      const { data } = await supabase.from("profiles").select("display_name").eq("user_id", autoUser.id).single();
-      if (data?.display_name) setDisplayName(data.display_name);
+      if (autoUser) {
+        const { data } = await supabase.from("profiles").select("display_name").eq("user_id", autoUser.id).single();
+        if (data?.display_name) setDisplayName(data.display_name);
 
-      const { data: userSettings } = await supabase
-        .from("user_camera_settings")
-        .select("*")
-        .eq("user_id", autoUser.id)
-        .single();
+        const { data: userSettings } = await supabase
+          .from("user_camera_settings")
+          .select("*")
+          .eq("user_id", autoUser.id)
+          .single();
+
+        if (userSettings) {
+          setRecordingDurationMin(Math.min(userSettings.recording_duration_minutes, maxDurationMin));
+          setMotionSensitivity(userSettings.motion_sensitivity);
+        }
+      }
 
       const { data: globalSettings } = await supabase
         .from("app_settings")
@@ -82,20 +87,15 @@ const CameraView = () => {
       const global = globalSettings?.setting_value as any;
       if (global) {
         setMaxDurationMin(global.max_duration_minutes || 60);
-        if (!userSettings) {
+        if (!autoUser) {
           setRecordingDurationMin(global.default_duration_minutes || 5);
           setMotionSensitivity(global.motion_sensitivity || 25);
           setMotionMinPercent(global.motion_min_percent || 1.5);
         }
       }
-
-      if (userSettings) {
-        setRecordingDurationMin(Math.min(userSettings.recording_duration_minutes, maxDurationMin));
-        setMotionSensitivity(userSettings.motion_sensitivity);
-      }
     };
     loadSettings();
-  }, [autoUser, authLoading]);
+  }, [autoUser]);
 
   const { room, connectionState, networkQuality, isConnecting, error, connect, disconnect, retry, audioOnly } = useLiveKit({
     roomName: roomName || "", participantName: displayName, isPublisher: true,
