@@ -24,16 +24,33 @@ if (-not $nodeInstalled) {
 }
 Write-Host "   ✅ Node.js $nodeVersion" -ForegroundColor Green
 
-# Check Java
-$javaInstalled = $false
-try { $javaVersion = java -version 2>&1 | Select-String "version"; $javaInstalled = $true } catch {}
-if (-not $javaInstalled) {
-    Write-Host "❌ Java is NOT installed." -ForegroundColor Red
-    Write-Host "   👉 Download JDK 17 from: https://adoptium.net/" -ForegroundColor White
-    Write-Host "   Then re-run this script.`n" -ForegroundColor White
-    exit 1
+# Check/Install JDK 21 (required by Capacitor 8)
+$jdk21Dir = "$HOME\.jdk\jdk-21"
+if (Test-Path "$jdk21Dir\bin\java.exe") {
+    Write-Host "   ✅ JDK 21 already downloaded" -ForegroundColor Green
+} else {
+    Write-Host "   ⬇️  Downloading JDK 21 (Adoptium Temurin)..." -ForegroundColor Yellow
+    $jdkZip = "$HOME\.jdk\jdk21.zip"
+    New-Item -ItemType Directory -Force -Path "$HOME\.jdk" | Out-Null
+    $jdkUrl = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip"
+    Invoke-WebRequest -Uri $jdkUrl -OutFile $jdkZip -UseBasicParsing
+    if (-not (Test-Path $jdkZip)) {
+        Write-Host "❌ Failed to download JDK 21." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "   📦 Extracting JDK 21..." -ForegroundColor Yellow
+    Expand-Archive -Path $jdkZip -DestinationPath "$HOME\.jdk\temp" -Force
+    $extractedDir = Get-ChildItem "$HOME\.jdk\temp" -Directory | Select-Object -First 1
+    if ($extractedDir) {
+        Move-Item $extractedDir.FullName $jdk21Dir -Force
+    }
+    Remove-Item -Recurse -Force "$HOME\.jdk\temp" -ErrorAction SilentlyContinue
+    Remove-Item $jdkZip -Force -ErrorAction SilentlyContinue
+    Write-Host "   ✅ JDK 21 installed to $jdk21Dir" -ForegroundColor Green
 }
-Write-Host "   ✅ Java detected" -ForegroundColor Green
+$env:JAVA_HOME = $jdk21Dir
+$env:PATH = "$jdk21Dir\bin;$env:PATH"
+Write-Host "   ✅ JAVA_HOME set to $jdk21Dir" -ForegroundColor Green
 
 # Check Git
 $gitInstalled = $false
@@ -125,53 +142,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "   ✅ Synced`n" -ForegroundColor Green
 
-# ── Step 6b: Force Java 17 for ALL subprojects (nuclear fix) ──
-Write-Host "🔧 Forcing Java 17 compatibility..." -ForegroundColor Yellow
-
-# Inject into the ROOT build.gradle to force Java 17 on ALL subprojects (including capacitor-android)
-$rootGradle = "android\build.gradle"
-$rootContent = Get-Content $rootGradle -Raw
-if ($rootContent -notmatch 'FORCE_JAVA_17_PATCH') {
-    $patch = @"
-
-// FORCE_JAVA_17_PATCH - auto-injected
-subprojects {
-    afterEvaluate {
-        tasks.withType(JavaCompile).configureEach {
-            sourceCompatibility = JavaVersion.VERSION_17
-            targetCompatibility = JavaVersion.VERSION_17
-        }
-    }
+# ── Step 6b: Set JAVA_HOME for Gradle ──
+Write-Host "🔧 Ensuring Gradle uses JDK 21..." -ForegroundColor Yellow
+$gradleProps = "android\gradle.properties"
+$propsContent = Get-Content $gradleProps -Raw
+if ($propsContent -notmatch 'org\.gradle\.java\.home') {
+    Add-Content $gradleProps "`norg.gradle.java.home=$($jdk21Dir -replace '\\', '/')"
+    Write-Host "   📝 Set org.gradle.java.home in gradle.properties" -ForegroundColor Gray
 }
-"@
-    Add-Content $rootGradle $patch
-    Write-Host "   📝 Injected Java 17 override into root build.gradle" -ForegroundColor Gray
-}
-
-# Also patch individual files as backup (handles Kotlin DSL jvmTarget etc.)
-Get-ChildItem -Path "android" -Recurse -Filter "*.gradle" | ForEach-Object {
-    $content = Get-Content $_.FullName -Raw
-    $patched = $content -replace 'JavaVersion\.VERSION_2[0-9]', 'JavaVersion.VERSION_17' `
-                        -replace 'JavaVersion\.VERSION_19', 'JavaVersion.VERSION_17' `
-                        -replace 'jvmTarget\s*[=:]\s*[''"]2[0-9][''"]', 'jvmTarget = "17"' `
-                        -replace 'jvmTarget\s*[=:]\s*[''"]19[''"]', 'jvmTarget = "17"' `
-                        -replace "sourceCompatibility\s+JavaVersion\.VERSION_\d+", "sourceCompatibility JavaVersion.VERSION_17" `
-                        -replace "targetCompatibility\s+JavaVersion\.VERSION_\d+", "targetCompatibility JavaVersion.VERSION_17"
-    if ($patched -ne $content) {
-        Set-Content $_.FullName $patched
-        Write-Host "   📝 Patched $($_.FullName)" -ForegroundColor Gray
-    }
-}
-Get-ChildItem -Path "android" -Recurse -Filter "*.gradle.kts" | ForEach-Object {
-    $content = Get-Content $_.FullName -Raw
-    $patched = $content -replace 'JavaVersion\.VERSION_2[0-9]', 'JavaVersion.VERSION_17' `
-                        -replace 'jvmTarget\.set\s*\(\s*"2[0-9]"\s*\)', 'jvmTarget.set("17")'
-    if ($patched -ne $content) {
-        Set-Content $_.FullName $patched
-        Write-Host "   📝 Patched $($_.FullName)" -ForegroundColor Gray
-    }
-}
-Write-Host "   ✅ Java 17 forced on all modules`n" -ForegroundColor Green
+Write-Host "   ✅ Gradle configured for JDK 21`n" -ForegroundColor Green
 
 # ── Step 7: Build the APK ──
 Write-Host "🏗️  Building APK (this takes 2-5 minutes on first run)..." -ForegroundColor Yellow
