@@ -19,12 +19,19 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: "autoUpdate",
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
-        navigateFallbackDenylist: [/^\/~oauth/],
+        // Never cache auth callbacks, LiveKit WebSocket, or Supabase API calls
+        navigateFallbackDenylist: [/^\/~oauth/, /^\/api/, /^\/functions/],
+        // Don't cache Supabase or LiveKit traffic
+        navigateFallback: null,
         runtimeCaching: [
           { urlPattern: /^https:\/\/fonts\.googleapis\.com/, handler: "StaleWhileRevalidate", options: { cacheName: "google-fonts-stylesheets" } },
           { urlPattern: /^https:\/\/fonts\.gstatic\.com/, handler: "CacheFirst", options: { cacheName: "google-fonts-webfonts", expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 } } },
         ],
+        // Exclude all API/realtime traffic from service worker interception
+        ignoreURLParametersMatching: [/.*/],
       },
       manifest: {
         name: "BabyCam.io",
