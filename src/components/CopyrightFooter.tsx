@@ -3,10 +3,10 @@ import { useNavigate } from "react-router-dom";
 
 // ── Editable social links — update usernames/URLs here ──
 const SOCIAL_LINKS = {
-  email: "contact@BabyCam.io",
-  facebook: { username: "themoonclyde", url: "https://facebook.com/themoonclyde" },
-  instagram: { username: "yourinstagram", url: "https://instagram.com/yourinstagram" },
-  twitter: { username: "yourtwitter", url: "https://x.com/yourtwitter" },
+  email: "contact@babycam.io",
+  facebook: { username: "BabyCam.io", url: "https://facebook.com/babycam.io" },
+  instagram: { username: "@babycam.io", url: "https://instagram.com/babycam.io" },
+  twitter: { username: "@babycamio", url: "https://x.com/babycamio" },
 };
 
 interface CopyrightFooterProps {
