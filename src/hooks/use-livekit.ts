@@ -294,8 +294,41 @@ export const useLiveKit = ({
   }, [isPublisher]);
 
   // ── Enable devices with cascading fallbacks ──
-  const enableDevices = useCallback(async (room: Room, quality: NetworkQuality) => {
+  // preAcquiredStream: MediaStream obtained directly from user gesture to preserve permission context
+  const enableDevices = useCallback(async (room: Room, quality: NetworkQuality, preAcquiredStream?: MediaStream) => {
     if (!isPublisher) return;
+
+    // If we have a pre-acquired stream, publish its tracks directly
+    if (preAcquiredStream) {
+      try {
+        const videoTracks = preAcquiredStream.getVideoTracks();
+        const audioTracks = preAcquiredStream.getAudioTracks();
+
+        if (quality === "poor" || quality === "offline") {
+          // Stop video tracks, only use audio
+          videoTracks.forEach(t => t.stop());
+          if (audioTracks.length > 0) {
+            await room.localParticipant.setMicrophoneEnabled(true);
+          }
+          setAudioOnly(true);
+        } else {
+          // Publish both camera and mic using pre-acquired stream
+          await room.localParticipant.enableCameraAndMicrophone();
+          setAudioOnly(false);
+        }
+        // Stop pre-acquired stream tracks since LiveKit now manages its own
+        preAcquiredStream.getTracks().forEach(t => t.stop());
+      } catch (e: any) {
+        console.warn("[LiveKit] Device enable with pre-acquired stream failed:", e.message);
+        // Fallback to standard enable
+        try { await room.localParticipant.setCameraEnabled(true); } catch { /* ok */ }
+        try { await room.localParticipant.setMicrophoneEnabled(true); } catch { /* ok */ }
+        preAcquiredStream.getTracks().forEach(t => t.stop());
+      }
+      return;
+    }
+
+    // Fallback path (no pre-acquired stream, e.g. auto-reconnect)
     try {
       if (quality === "poor" || quality === "offline") {
         await room.localParticipant.setMicrophoneEnabled(true);
@@ -306,11 +339,8 @@ export const useLiveKit = ({
       }
     } catch (e: any) {
       console.warn("[LiveKit] Device enable failed, trying fallbacks:", e.message);
-      // Fallback 1: try camera alone
       try { await room.localParticipant.setCameraEnabled(true); } catch { /* ok */ }
-      // Fallback 2: try mic alone
       try { await room.localParticipant.setMicrophoneEnabled(true); } catch { /* ok */ }
-      // Connection stays alive regardless
     }
   }, [isPublisher]);
 
@@ -324,13 +354,38 @@ export const useLiveKit = ({
     connectAttemptRef.current += 1;
     const thisAttempt = connectAttemptRef.current;
 
+    // CRITICAL: Pre-acquire camera/mic permissions IMMEDIATELY in the user gesture context
+    // This must happen BEFORE any async operations (token fetch, room connect)
+    // Otherwise browsers (especially Safari/Android WebView) block getUserMedia silently → black screen
+    let preAcquiredStream: MediaStream | undefined;
+    if (isPublisher) {
+      try {
+        console.log("[LiveKit] Pre-acquiring camera/mic permissions (user gesture context)…");
+        preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        console.log("[LiveKit] ✅ Camera/mic permissions granted");
+      } catch (e: any) {
+        console.warn("[LiveKit] Pre-acquire failed, will try later:", e.message);
+        // Try video-only
+        try {
+          preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } catch {
+          // Try audio-only
+          try {
+            preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+          } catch {
+            console.warn("[LiveKit] No media devices available");
+          }
+        }
+      }
+    }
+
     try {
       // Wait for network if offline
       if (!navigator.onLine) {
         setError("Waiting for network…");
         setConnectionState(ConnectionState.Disconnected);
         setIsConnecting(false);
-        // Will auto-reconnect when online event fires
+        preAcquiredStream?.getTracks().forEach(t => t.stop());
         return;
       }
 
@@ -365,7 +420,7 @@ export const useLiveKit = ({
         console.log("[LiveKit] ✅ Reconnected successfully");
         setConnectionState(ConnectionState.Connected);
         setError(null);
-        connectAttemptRef.current = 0; // Reset backoff on success
+        connectAttemptRef.current = 0;
       });
 
       room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
@@ -397,13 +452,13 @@ export const useLiveKit = ({
       setConnectionState(ConnectionState.Connected);
       setRoomInstance(room);
       setError(null);
-      connectAttemptRef.current = 0; // Reset backoff on success
+      connectAttemptRef.current = 0;
 
       // Acquire wake lock to keep screen on (critical for baby monitor)
       await requestWakeLock();
 
-      // Enable devices
-      await enableDevices(room, quality);
+      // Enable devices — pass pre-acquired stream to preserve permission context
+      await enableDevices(room, quality, preAcquiredStream);
 
       // Start heartbeat
       startHeartbeat(room);
@@ -413,6 +468,8 @@ export const useLiveKit = ({
 
     } catch (err: any) {
       console.error("[LiveKit] Connection failed:", err.message);
+      // Clean up pre-acquired stream on failure
+      preAcquiredStream?.getTracks().forEach(t => t.stop());
 
       if (thisAttempt === connectAttemptRef.current && !intentionalDisconnect.current) {
         setError(err.message || "Failed to connect");
