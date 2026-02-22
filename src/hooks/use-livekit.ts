@@ -26,7 +26,7 @@ interface UseLiveKitReturn {
   connectionType: ConnectionType;
   isConnecting: boolean;
   error: string | null;
-  connect: () => Promise<void>;
+  connect: (preAcquiredStream?: MediaStream) => Promise<void>;
   disconnect: () => void;
   retry: () => Promise<void>;
   audioOnly: boolean;
@@ -349,7 +349,7 @@ export const useLiveKit = ({
   }, [isPublisher]);
 
   // ── Core connect with full resilience ──
-  const connectToRoom = useCallback(async () => {
+  const connectToRoom = useCallback(async (externalStream?: MediaStream) => {
     if (roomRef.current?.state === ConnectionState.Connected) return;
 
     setIsConnecting(true);
@@ -358,27 +358,18 @@ export const useLiveKit = ({
     connectAttemptRef.current += 1;
     const thisAttempt = connectAttemptRef.current;
 
-    // CRITICAL: Pre-acquire camera/mic permissions IMMEDIATELY in the user gesture context
-    // This must happen BEFORE any async operations (token fetch, room connect)
-    // Otherwise browsers (especially Safari/Android WebView) block getUserMedia silently → black screen
-    let preAcquiredStream: MediaStream | undefined;
-    if (isPublisher) {
+    // Use externally-provided stream (acquired in direct click handler for gesture context)
+    // or try to acquire here as fallback (for auto-reconnect scenarios)
+    let preAcquiredStream: MediaStream | undefined = externalStream;
+    if (!preAcquiredStream && isPublisher) {
       try {
-        console.log("[LiveKit] Pre-acquiring camera/mic permissions (user gesture context)…");
+        console.log("[LiveKit] No external stream — trying getUserMedia (auto-reconnect)…");
         preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        console.log("[LiveKit] ✅ Camera/mic permissions granted");
       } catch (e: any) {
-        console.warn("[LiveKit] Pre-acquire failed, will try later:", e.message);
-        // Try video-only
-        try {
-          preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        } catch {
-          // Try audio-only
-          try {
-            preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-          } catch {
-            console.warn("[LiveKit] No media devices available");
-          }
+        console.warn("[LiveKit] getUserMedia fallback failed:", e.message);
+        try { preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); } catch {}
+        if (!preAcquiredStream) {
+          try { preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true }); } catch {}
         }
       }
     }
