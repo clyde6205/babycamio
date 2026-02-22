@@ -160,19 +160,25 @@ export const useLiveKit = ({
   }, []);
 
   const fetchToken = useCallback(async (): Promise<{ token: string; url: string }> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error("Not authenticated");
-
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    };
+
+    // Attach auth if available, but don't require it
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+    } catch { /* no auth, that's fine */ }
+
     const response = await fetch(
       `https://${projectId}.supabase.co/functions/v1/livekit-token`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
+        headers,
         body: JSON.stringify({ roomName, participantName, isPublisher }),
       }
     );

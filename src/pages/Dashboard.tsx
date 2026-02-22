@@ -45,18 +45,18 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (authLoading || !user) return;
-
     const load = async () => {
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id);
-      if (roles?.some((r: any) => r.role === "admin")) setIsAdmin(true);
+      if (user) {
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id);
+        if (roles?.some((r: any) => r.role === "admin")) setIsAdmin(true);
+      }
       await fetchRooms();
     };
     load();
-  }, [user, authLoading]);
+  }, [user]);
 
   const fetchRooms = async () => {
     setLoading(true);
@@ -101,7 +101,7 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  if (authLoading) {
+  if (authLoading && !user) {
     return <div className="flex min-h-screen items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   }
 
