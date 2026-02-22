@@ -286,11 +286,20 @@ const CameraView = () => {
     if (!room || connectionState !== ConnectionState.Connected) return;
     const attachVideo = () => {
       const publication = room.localParticipant.getTrackPublication(Track.Source.Camera);
-      if (publication?.track && videoRef.current) publication.track.attach(videoRef.current);
+      if (publication?.track && videoRef.current) {
+        console.log("[CameraView] Attaching camera track to video element");
+        publication.track.attach(videoRef.current);
+      }
     };
+    // Try immediately
     attachVideo();
+    // Listen for both trackPublished (from enableCameraAndMicrophone) and localTrackPublished (from publishTrack)
     room.localParticipant.on("trackPublished", attachVideo);
-    return () => { room.localParticipant.off("trackPublished", attachVideo); };
+    room.localParticipant.on("localTrackPublished", attachVideo);
+    return () => {
+      room.localParticipant.off("trackPublished", attachVideo);
+      room.localParticipant.off("localTrackPublished", attachVideo);
+    };
   }, [room, connectionState]);
 
   useEffect(() => {
