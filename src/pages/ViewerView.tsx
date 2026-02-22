@@ -102,6 +102,16 @@ const ViewerView = () => {
     roomName: roomName || "", participantName: displayName, isPublisher: false,
   });
 
+  // AUTO-CONNECT: Viewer opens link = immediately starts watching. Zero taps.
+  const autoConnectedRef = useRef(false);
+  useEffect(() => {
+    if (!autoConnectedRef.current && displayName && roomName && connectionState === ConnectionState.Disconnected && !isConnecting && !error) {
+      autoConnectedRef.current = true;
+      console.log("[Viewer] Auto-connecting — zero tap experience");
+      connect();
+    }
+  }, [displayName, roomName, connectionState, isConnecting, error, connect]);
+
   useEffect(() => {
     if (!room) return;
     const handleData = (payload: Uint8Array) => {
@@ -285,23 +295,30 @@ const ViewerView = () => {
             )}
           </div>
         )}
-        {!isConnected && !isReconnecting && (
+        {!isConnected && !isReconnecting && !isConnecting && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 brand-gradient">
-            <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-[hsl(213,80%,70%)]/30 bg-white/5">
-              <Eye className="h-12 w-12 text-[hsl(213,80%,70%)]" />
-            </div>
+            <Loader2 className="h-12 w-12 animate-spin text-[hsl(213,80%,70%)]" />
             <div className="text-center">
               <h2 className="mb-1 text-xl font-bold capitalize">{friendlyName}</h2>
-              <p className="text-sm text-white/50">{t("viewer.connectToView")}</p>
+              <p className="text-sm text-white/50">Connecting to camera…</p>
             </div>
-            {error && (<div className="rounded-lg bg-red-500/20 px-4 py-2 text-center"><p className="text-sm text-red-300">{error}</p></div>)}
-            <Button size="lg" onClick={() => error ? retry() : connect()} disabled={isConnecting} className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target">
-              {isConnecting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : error ? <RefreshCw className="mr-2 h-5 w-5" /> : <Eye className="mr-2 h-5 w-5" />}
-              {isConnecting ? t("camera.connecting") : error ? t("camera.retry") : t("viewer.watchLive")}
-            </Button>
-            <Button size="lg" onClick={() => setShowShareQR(true)} className="bg-white text-black hover:bg-white/90 font-semibold px-8 touch-target mt-3">
-              <Share2 className="mr-2 h-5 w-5" /> Share This Camera
-            </Button>
+            {error && (
+              <div className="rounded-lg bg-red-500/20 px-4 py-2 text-center">
+                <p className="text-sm text-red-300">{error}</p>
+                <Button size="lg" onClick={() => retry()} className="bg-[hsl(213,70%,55%)] hover:bg-[hsl(213,80%,70%)] text-white font-semibold px-10 touch-target mt-3">
+                  <RefreshCw className="mr-2 h-5 w-5" /> Retry
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+        {isConnecting && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 brand-gradient">
+            <Loader2 className="h-12 w-12 animate-spin text-[hsl(213,80%,70%)]" />
+            <div className="text-center">
+              <h2 className="mb-1 text-xl font-bold capitalize">{friendlyName}</h2>
+              <p className="text-sm text-white/50">Connecting to camera…</p>
+            </div>
           </div>
         )}
       </div>
