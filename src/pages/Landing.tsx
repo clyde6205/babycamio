@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Shield, Video, Wifi, WifiOff, Volume2, Bell, Star, Download, CheckCircle2, Globe, Copy, Smartphone } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
-import heroImage from "@/assets/babycam-hero.webp";
+import heroImage from "@/assets/babycam-hero-optimized.webp";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import CopyrightFooter from "@/components/CopyrightFooter";
 
