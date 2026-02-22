@@ -69,11 +69,12 @@ const Dashboard = () => {
   };
 
   const createRoom = async () => {
-    if (!newRoomName.trim() || !user) return;
+    if (!newRoomName.trim()) return;
     setCreating(true);
     const roomSlug = newRoomName.trim().toLowerCase().replace(/\s+/g, "-") + "-" + Date.now().toString(36);
+    const ownerId = user?.id || crypto.randomUUID();
     const { error } = await supabase.from("rooms").insert({
-      room_name: roomSlug, owner_id: user.id, room_type: "baby",
+      room_name: roomSlug, owner_id: ownerId, room_type: "baby",
     });
     if (error) {
       toast({ title: t("common.error"), description: error.message, variant: "destructive" });
@@ -101,9 +102,7 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  if (authLoading && !user) {
-    return <div className="flex min-h-screen items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
-  }
+  // Never block the dashboard — show content even without auth
 
   return (
     <div className="min-h-screen bg-background">
