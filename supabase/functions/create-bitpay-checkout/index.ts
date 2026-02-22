@@ -10,8 +10,8 @@ const BITPAY_API_URL = "https://bitpay.com";
 
 const PLAN_PRICES: Record<string, Record<string, number>> = {
   pro: {
-    monthly: 9.97,
-    annual: 89.0,
+    monthly: 10.97,
+    annual: 99.0,
   },
 };
 

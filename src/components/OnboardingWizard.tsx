@@ -1,31 +1,30 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Video, Shield, Bell, Camera, ArrowRight, CheckCircle2, Baby } from "lucide-react";
+import { Camera, Shield, Bell, ArrowRight, CheckCircle2, Baby } from "lucide-react";
 
 const STEPS = [
   {
     icon: Baby,
-    title: "Welcome to BabyCam.io",
-    desc: "The world's most advanced baby monitoring app. Keep your little one safe from anywhere.",
+    title: "👶 BabyCam.io",
+    desc: "Watch your baby from anywhere. Safe. Simple. Free.",
     color: "text-primary",
   },
   {
     icon: Camera,
-    title: "Set Up Your Camera",
-    desc: "Place your phone near your baby's crib. We'll use the camera to stream live video to your other devices.",
+    title: "📱 Set Up Camera",
+    desc: "Put one phone near baby. Watch from another phone.",
     color: "text-green-400",
   },
   {
     icon: Shield,
-    title: "Secure & Private",
-    desc: "All streams are end-to-end encrypted. Only people you invite can watch. No data stored on our servers.",
+    title: "🔒 Private & Safe",
+    desc: "Only you can see. Nobody else. Encrypted.",
     color: "text-blue-400",
   },
   {
     icon: Bell,
-    title: "Smart Alerts",
-    desc: "Get instant notifications when motion or crying is detected. AI-powered cry detection keeps you informed.",
+    title: "🔔 Get Alerts",
+    desc: "Baby cries? Phone moves? You get notified instantly.",
     color: "text-orange-400",
   },
 ];
@@ -67,19 +66,19 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       </div>
 
       <h1 className="text-2xl font-bold text-center mb-3">{current.title}</h1>
-      <p className="text-center text-muted-foreground max-w-sm mb-12">{current.desc}</p>
+      <p className="text-center text-muted-foreground max-w-xs text-lg mb-12">{current.desc}</p>
 
       <div className="flex flex-col gap-3 w-full max-w-xs">
-        <Button size="lg" onClick={next} className="touch-target w-full">
+        <Button size="lg" onClick={next} className="touch-target w-full text-lg py-6">
           {step === STEPS.length - 1 ? (
-            <><CheckCircle2 className="mr-2 h-5 w-5" /> Get Started</>
+            <><CheckCircle2 className="mr-2 h-6 w-6" /> Start Now ✨</>
           ) : (
-            <><ArrowRight className="mr-2 h-5 w-5" /> Continue</>
+            <><ArrowRight className="mr-2 h-6 w-6" /> Next →</>
           )}
         </Button>
         {step < STEPS.length - 1 && (
           <Button variant="ghost" size="sm" onClick={skip} className="text-muted-foreground">
-            Skip tutorial
+            Skip →
           </Button>
         )}
       </div>

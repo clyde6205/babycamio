@@ -8,8 +8,8 @@ const corsHeaders = {
 
 const PLAN_PRICES: Record<string, Record<string, number>> = {
   pro: {
-    monthly: 997,  // $9.97 in cents
-    annual: 8900,  // $89.00 in cents
+    monthly: 1097,  // $10.97 in cents
+    annual: 9900,   // $99.00 in cents
   },
 };
 
@@ -65,7 +65,7 @@ serve(async (req) => {
 
     const priceAmount = PLAN_PRICES[plan][billing] || PLAN_PRICES[plan].monthly;
     const interval = billing === "annual" ? "year" : "month";
-    const priceLabel = billing === "annual" ? "$89.00/year" : "$9.97/month";
+    const priceLabel = billing === "annual" ? "$99.00/year" : "$10.97/month";
 
     // Try env vars first, then fall back to DB-stored keys
     const dbKeys = await getProviderKeys(supabase, user.id, provider);
@@ -155,7 +155,7 @@ serve(async (req) => {
           body: JSON.stringify({
             intent: "CAPTURE",
             purchase_units: [{
-              amount: { currency_code: "USD", value: billing === "annual" ? "89.00" : "9.97" },
+              amount: { currency_code: "USD", value: billing === "annual" ? "99.00" : "10.97" },
               description: `BabyCam Pro ${billing === "annual" ? "Annual" : "Monthly"}`,
               custom_id: user.id,
             }],
