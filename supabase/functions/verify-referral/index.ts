@@ -21,7 +21,9 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
@@ -85,20 +87,24 @@ serve(async (req) => {
         if (sub.plan === "pro" && sub.status === "active" && sub.current_period_end) {
           const currentEnd = new Date(sub.current_period_end);
           const newEnd = new Date(Math.max(currentEnd.getTime(), now.getTime()) + rewardMs);
-          await supabase.from("subscriptions").update({
+          const { error: upErr } = await supabase.from("subscriptions").update({
             current_period_end: newEnd.toISOString(),
           }).eq("id", sub.id);
+          if (upErr) console.error("[grantPro] extend error:", upErr);
+          else console.log("[grantPro] Extended Pro for", userId, "until", newEnd.toISOString());
         } else {
           // Upgrade to pro
           const newEnd = new Date(now.getTime() + rewardMs);
-          await supabase.from("subscriptions").update({
+          const { error: upErr } = await supabase.from("subscriptions").update({
             plan: "pro",
             status: "active",
             payment_provider: "referral",
             current_period_start: now.toISOString(),
             current_period_end: newEnd.toISOString(),
-            cancel_at_period_end: true, // will revert to free after period
+            cancel_at_period_end: true,
           }).eq("id", sub.id);
+          if (upErr) console.error("[grantPro] upgrade error:", upErr);
+          else console.log("[grantPro] Upgraded to Pro for", userId, "until", newEnd.toISOString());
         }
       } else {
         // No subscription row — create one
