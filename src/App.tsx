@@ -31,6 +31,7 @@ const BabyCareLog = lazy(() => import("./pages/BabyCareLog"));
 const Milestones = lazy(() => import("./pages/Milestones"));
 const CaregiverMode = lazy(() => import("./pages/CaregiverMode"));
 const InstallApp = lazy(() => import("./pages/InstallApp"));
+const Diagnostics = lazy(() => import("./pages/Diagnostics"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -101,6 +102,8 @@ const App = () => {
               <Route path="/install" element={<SafePage scope="Install"><InstallApp /></SafePage>} />
               <Route path="/camera/:roomName" element={<SafePage scope="Camera"><CameraView /></SafePage>} />
               <Route path="/viewer/:roomName" element={<SafePage scope="Viewer"><ViewerView /></SafePage>} />
+              <Route path="/diagnostics" element={<SafePage scope="Diagnostics"><Diagnostics /></SafePage>} />
+              <Route path="*" element={<NotFound />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
