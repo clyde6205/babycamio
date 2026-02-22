@@ -339,10 +339,18 @@ const CameraView = () => {
     };
   }, [room, connectionState]);
 
+  // AUTO-SHOW SHARE: When camera goes live, immediately show the share QR
+  // so the user knows exactly what to do next — share the link to the viewer phone
+  const sharedOnceRef = useRef(false);
   useEffect(() => {
     if (connectionState === ConnectionState.Connected) {
       setElapsedTime(0);
       timerRef.current = window.setInterval(() => setElapsedTime((t) => t + 1), 1000);
+      // Show share overlay automatically the FIRST time we go live
+      if (!sharedOnceRef.current) {
+        sharedOnceRef.current = true;
+        setTimeout(() => setShowShareQR(true), 1500); // Brief delay so user sees "LIVE" first
+      }
     } else { if (timerRef.current) clearInterval(timerRef.current); }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [connectionState]);
