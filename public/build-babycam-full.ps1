@@ -127,24 +127,22 @@ Write-Host "   ✅ Synced`n" -ForegroundColor Green
 
 # ── Step 6b: Patch Java compatibility to 17 ──
 Write-Host "🔧 Patching Java compatibility..." -ForegroundColor Yellow
-$gradleProps = "android\gradle.properties"
-$propsContent = Get-Content $gradleProps -Raw -ErrorAction SilentlyContinue
-if ($propsContent -notmatch "patched_java17") {
-    Add-Content $gradleProps "`n# patched_java17"
-    # Patch capacitor-android build.gradle to use Java 17
-    $capBuildGradle = "android\capacitor-android\build.gradle"
-    if (Test-Path $capBuildGradle) {
-        (Get-Content $capBuildGradle -Raw) -replace 'JavaVersion\.VERSION_21', 'JavaVersion.VERSION_17' -replace 'sourceCompatibility JavaVersion\.VERSION_\d+', 'sourceCompatibility JavaVersion.VERSION_17' -replace 'targetCompatibility JavaVersion\.VERSION_\d+', 'targetCompatibility JavaVersion.VERSION_17' | Set-Content $capBuildGradle
+
+# Patch ALL build.gradle and build.gradle.kts files recursively
+Get-ChildItem -Path "android" -Recurse -Include "build.gradle","build.gradle.kts" | ForEach-Object {
+    $content = Get-Content $_.FullName -Raw
+    $patched = $content -replace 'JavaVersion\.VERSION_21', 'JavaVersion.VERSION_17' `
+                        -replace 'JavaVersion\.VERSION_19', 'JavaVersion.VERSION_17' `
+                        -replace 'JavaVersion\.VERSION_20', 'JavaVersion.VERSION_17' `
+                        -replace 'jvmTarget\s*=\s*"21"', 'jvmTarget = "17"' `
+                        -replace 'sourceCompatibility\s*=\s*JavaVersion\.VERSION_\d+', 'sourceCompatibility = JavaVersion.VERSION_17' `
+                        -replace 'targetCompatibility\s*=\s*JavaVersion\.VERSION_\d+', 'targetCompatibility = JavaVersion.VERSION_17'
+    if ($patched -ne $content) {
+        Set-Content $_.FullName $patched
+        Write-Host "   📝 Patched $($_.FullName)" -ForegroundColor Gray
     }
-    # Also patch the main app build.gradle
-    $appBuildGradle = "android\app\build.gradle"
-    if (Test-Path $appBuildGradle) {
-        (Get-Content $appBuildGradle -Raw) -replace 'JavaVersion\.VERSION_21', 'JavaVersion.VERSION_17' -replace 'sourceCompatibility JavaVersion\.VERSION_\d+', 'sourceCompatibility JavaVersion.VERSION_17' -replace 'targetCompatibility JavaVersion\.VERSION_\d+', 'targetCompatibility JavaVersion.VERSION_17' | Set-Content $appBuildGradle
-    }
-    Write-Host "   ✅ Patched to Java 17`n" -ForegroundColor Green
-} else {
-    Write-Host "   ✅ Already patched`n" -ForegroundColor Green
 }
+Write-Host "   ✅ Java 17 compatibility applied`n" -ForegroundColor Green
 
 # ── Step 7: Build the APK ──
 Write-Host "🏗️  Building APK (this takes 2-5 minutes on first run)..." -ForegroundColor Yellow
