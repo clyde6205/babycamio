@@ -79,7 +79,7 @@ Respond with ONLY a JSON object: {"classification": "crying|fussing|babbling|sle
     });
   } catch (error) {
     console.error("[CryDetection] Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: "An error occurred processing your request" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
