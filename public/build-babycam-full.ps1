@@ -267,23 +267,34 @@ try {
             Write-Host "║  📋  DEVICE CRASH LOG (last 8 seconds)        ║" -ForegroundColor Cyan
             Write-Host "╚══════════════════════════════════════════════╝" -ForegroundColor Cyan
 
-            # Capture FATAL, crash, and app-related errors
+            # Capture ONLY BabyCam app logs (filter by package name)
             $logFile = "$projectDir\crash-log.txt"
-            adb logcat -d -t 500 *> $logFile
+            $babycamPid = (adb shell pidof io.babycam.app 2>$null).Trim()
             
-            # Show the most relevant lines
-            Write-Host "`n--- FATAL / CRASH lines ---" -ForegroundColor Red
-            Get-Content $logFile | Select-String -Pattern "FATAL|AndroidRuntime|crash|died|Exception|Error|io\.babycam" -AllMatches | Select-Object -First 60 | ForEach-Object {
-                Write-Host $_.Line -ForegroundColor Red
+            if ($babycamPid) {
+                Write-Host "   🔍 BabyCam PID: $babycamPid — filtering logs to this process only" -ForegroundColor Gray
+                adb logcat -d --pid=$babycamPid *> $logFile
+            } else {
+                Write-Host "   ⚠️  BabyCam process not running (may have crashed). Filtering by tag..." -ForegroundColor Yellow
+                adb logcat -d -t 500 *> "$projectDir\full-log.txt"
+                Get-Content "$projectDir\full-log.txt" | Select-String -Pattern "io\.babycam|Capacitor|WebView|AndroidRuntime" > $logFile
+            }
+            
+            # Show FATAL / CRASH lines from BabyCam only
+            Write-Host "`n--- BabyCam FATAL / CRASH lines ---" -ForegroundColor Red
+            $crashLines = Get-Content $logFile | Select-String -Pattern "FATAL|AndroidRuntime|crash|died|Exception" -AllMatches | Select-Object -First 40
+            if ($crashLines.Count -eq 0) {
+                Write-Host "   ✅ No crashes detected from BabyCam!" -ForegroundColor Green
+            } else {
+                $crashLines | ForEach-Object { Write-Host $_.Line -ForegroundColor Red }
             }
 
-            Write-Host "`n--- WebView / Capacitor lines ---" -ForegroundColor Yellow
-            Get-Content $logFile | Select-String -Pattern "Capacitor|WebView|chromium|net::" -AllMatches | Select-Object -First 30 | ForEach-Object {
+            Write-Host "`n--- BabyCam WebView / Capacitor lines ---" -ForegroundColor Yellow
+            Get-Content $logFile | Select-String -Pattern "Capacitor|WebView|chromium|net::" -AllMatches | Select-Object -First 20 | ForEach-Object {
                 Write-Host $_.Line -ForegroundColor Yellow
             }
 
-            Write-Host "`n📄 Full log saved to: $logFile" -ForegroundColor Cyan
-            Write-Host "   Copy/paste the RED lines above to diagnose the issue.`n" -ForegroundColor White
+            Write-Host "`n📄 Full BabyCam log saved to: $logFile" -ForegroundColor Cyan
         } else {
             Write-Host "⚠️  Install failed. Try manually:" -ForegroundColor Yellow
             Write-Host "   adb install babycam-debug.apk" -ForegroundColor White
