@@ -6,7 +6,7 @@ import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { useSubscription } from "@/hooks/use-subscription";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Trash2, Play, Loader2, Film, HardDrive, Crown, Share2 } from "lucide-react";
+import { ArrowLeft, Trash2, Play, Loader2, Film, HardDrive, Crown, Share2, Download } from "lucide-react";
 import ShareRecordingDialog from "@/components/ShareRecordingDialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -60,7 +60,20 @@ const Recordings = () => {
     if (playingId === rec.id) { setPlayingId(null); setVideoUrl(null); return; }
     const { data } = await supabase.storage.from("recordings").createSignedUrl(rec.file_path, 3600);
     if (data?.signedUrl) { setVideoUrl(data.signedUrl); setPlayingId(rec.id); }
-    else toast({ title: "Failed to load recording", variant: "destructive" });
+    else toast({ title: "Failed to load recording", description: "The file may have been deleted from cloud storage.", variant: "destructive" });
+  };
+
+  const downloadRecording = async (rec: Recording) => {
+    const { data } = await supabase.storage.from("recordings").createSignedUrl(rec.file_path, 3600);
+    if (data?.signedUrl) {
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = rec.file_path.split("/").pop() || "recording";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      toast({ title: "Downloading…" });
+    } else {
+      toast({ title: "Download failed", variant: "destructive" });
+    }
   };
 
   const deleteRecording = async (rec: Recording) => {
@@ -186,6 +199,15 @@ const Recordings = () => {
                       onClick={() => playRecording(rec)}
                     >
                       <Play className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-9 w-9"
+                      onClick={() => downloadRecording(rec)}
+                      title="Download"
+                    >
+                      <Download className="h-4 w-4" />
                     </Button>
                     <ShareRecordingDialog
                       recordingId={rec.id}

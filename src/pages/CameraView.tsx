@@ -193,63 +193,64 @@ const CameraView = () => {
         const ext = mimeType.includes("webm") ? "webm" : "mp4";
         const ts = new Date().toISOString().replace(/[:.]/g, "-");
         const fileName = `babycam-motion-${ts}.${ext}`;
-        const filePath = `${userId || "anonymous"}/${fileName}`;
         const sizeMB = (blob.size / 1024 / 1024).toFixed(1);
 
-        // Check storage usage before uploading
-        let currentUsage = 0;
-        if (userId) {
-          const { data: usageData } = await supabase
-            .from("recordings")
-            .select("file_size_bytes")
-            .eq("user_id", userId);
-          currentUsage = (usageData || []).reduce((sum, r) => sum + (r.file_size_bytes || 0), 0);
-        }
+        // CLOUD-FIRST: Always try Supabase upload first
+        // Get fresh auth session for upload
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUserId = session?.user?.id || userId;
 
-        if (currentUsage + blob.size > storageLimitBytes) {
-          // Over limit — fallback to local download
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url; a.download = fileName;
-          document.body.appendChild(a); a.click(); document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          toast({ title: "Storage full", description: `Cloud limit reached. Recording saved locally (${sizeMB} MB).`, variant: "destructive" });
+        if (!currentUserId) {
+          console.error("[Recording] No authenticated user — cannot upload to cloud");
+          toast({ title: "Sign in required", description: "Please sign in to save recordings to cloud.", variant: "destructive" });
           return;
         }
 
-        toast({ title: "Uploading recording…", description: `${sizeMB} MB to cloud storage` });
+        const filePath = `${currentUserId}/${fileName}`;
+
+        // Check storage usage
+        const { data: usageData } = await supabase
+          .from("recordings")
+          .select("file_size_bytes")
+          .eq("user_id", currentUserId);
+        const currentUsage = (usageData || []).reduce((sum, r) => sum + (r.file_size_bytes || 0), 0);
+
+        if (currentUsage + blob.size > storageLimitBytes) {
+          toast({ title: "Cloud storage full", description: `Limit reached (${sizeMB} MB). Delete old recordings or upgrade.`, variant: "destructive" });
+          return;
+        }
+
+        toast({ title: "Uploading recording…", description: `${sizeMB} MB to cloud` });
+        console.log(`[Recording] Uploading ${sizeMB} MB to cloud path: ${filePath}`);
 
         const { error: uploadError } = await supabase.storage
           .from("recordings")
           .upload(filePath, blob, { contentType: mimeType, upsert: false });
 
         if (uploadError) {
-          console.error("[Recording] Upload failed:", uploadError);
-          // Fallback: download locally
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url; a.download = fileName;
-          document.body.appendChild(a); a.click(); document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          toast({ title: "Cloud upload failed", description: `Recording saved locally instead (${sizeMB} MB)`, variant: "destructive" });
+          console.error("[Recording] Cloud upload failed:", uploadError.message, uploadError);
+          toast({ title: "Upload failed", description: `Error: ${uploadError.message}. Check your connection.`, variant: "destructive" });
           return;
         }
 
-        // Save metadata
-        if (userId) {
-          const elapsed = recordingDurationMin * 60 - recordingTimeLeft;
-          await supabase.from("recordings").insert({
-            user_id: userId,
-            room_name: roomName || "",
-            file_path: filePath,
-            file_size_bytes: blob.size,
-            duration_seconds: elapsed > 0 ? elapsed : recordingDurationMin * 60,
-            mime_type: mimeType,
-            trigger_type: "motion",
-          });
+        // Save metadata to database
+        const elapsed = recordingDurationMin * 60 - recordingTimeLeft;
+        const { error: insertError } = await supabase.from("recordings").insert({
+          user_id: currentUserId,
+          room_name: roomName || "",
+          file_path: filePath,
+          file_size_bytes: blob.size,
+          duration_seconds: elapsed > 0 ? elapsed : recordingDurationMin * 60,
+          mime_type: mimeType,
+          trigger_type: "motion",
+        });
+
+        if (insertError) {
+          console.error("[Recording] Metadata insert failed:", insertError.message);
         }
 
         toast({ title: "Recording saved ☁️", description: `${sizeMB} MB uploaded to cloud` });
+        console.log("[Recording] ✅ Cloud upload + metadata complete");
       };
       recorder.start(1000);
       mediaRecorderRef.current = recorder;
