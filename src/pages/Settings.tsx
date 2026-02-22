@@ -21,6 +21,7 @@ interface ProviderConfig {
 }
 
 const PROVIDERS: ProviderConfig[] = [
+  { id: "twilio", name: "Twilio SMS", icon: "📱", description: "Send & receive SMS worldwide", keys: [{ name: "account_sid", label: "Account SID", placeholder: "AC..." }, { name: "auth_token", label: "Auth Token", placeholder: "Your auth token" }, { name: "phone_number", label: "Twilio Phone Number", placeholder: "+1234567890" }] },
   { id: "stripe", name: "Stripe", icon: "💳", description: "Credit/Debit cards — Global", keys: [{ name: "secret_key", label: "Secret Key", placeholder: "sk_live_..." }, { name: "webhook_secret", label: "Webhook Secret", placeholder: "whsec_..." }] },
   { id: "paypal", name: "PayPal", icon: "🅿️", description: "PayPal payments — Global", keys: [{ name: "client_id", label: "Client ID", placeholder: "AX..." }, { name: "secret", label: "Secret", placeholder: "EL..." }] },
   { id: "paymongo", name: "PayMongo (GCash/Maya)", icon: "🇵🇭", description: "GCash & Maya — Philippines", keys: [{ name: "secret_key", label: "Secret Key", placeholder: "sk_live_..." }, { name: "webhook_secret", label: "Webhook Secret (optional)", placeholder: "whsec_..." }] },
