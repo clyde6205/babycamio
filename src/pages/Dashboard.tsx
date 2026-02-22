@@ -108,7 +108,8 @@ const Dashboard = () => {
   };
 
   const copyRoomCode = (roomName: string) => {
-    const viewerUrl = `${window.location.origin}/viewer/${roomName}`;
+    const appBase = "https://babycamio.lovable.app";
+    const viewerUrl = `${appBase}/viewer/${roomName}`;
     navigator.clipboard.writeText(viewerUrl);
     setCopiedId(roomName);
     setTimeout(() => setCopiedId(null), 2000);
@@ -249,7 +250,7 @@ const Dashboard = () => {
                     size="lg"
                     className="w-full touch-target bg-green-600 hover:bg-green-700 text-white font-bold text-base"
                     onClick={() => {
-                      const link = `${window.location.origin}/viewer/${room.room_name}`;
+                      const link = `https://babycamio.lovable.app/viewer/${room.room_name}`;
                       if (navigator.share) {
                         navigator.share({ title: "BabyCam", text: "Watch my baby camera live!", url: link }).catch(() => {});
                       } else {
