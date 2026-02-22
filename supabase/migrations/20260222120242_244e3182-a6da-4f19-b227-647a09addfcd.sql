@@ -1,0 +1,2 @@
+ALTER TABLE public.subscriptions DROP CONSTRAINT subscriptions_payment_provider_check;
+ALTER TABLE public.subscriptions ADD CONSTRAINT subscriptions_payment_provider_check CHECK (payment_provider = ANY (ARRAY['stripe'::text, 'paypal'::text, 'paymongo'::text, 'mpesa'::text, 'referral'::text]));
