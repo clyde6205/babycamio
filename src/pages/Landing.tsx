@@ -1,10 +1,14 @@
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { Shield, Video, Wifi, WifiOff, Volume2, Bell, Star, Download, CheckCircle2, Globe } from "lucide-react";
+import { Shield, Video, Wifi, WifiOff, Volume2, Bell, Star, Download, CheckCircle2, Globe, Copy, Smartphone } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { toast } from "sonner";
 import heroImage from "@/assets/babycam-hero.webp";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import CopyrightFooter from "@/components/CopyrightFooter";
+
+const APP_URL = "https://babycamio.lovable.app";
 
 const TESTIMONIALS = [
   { name: "Sarah M.", country: "🇺🇸 USA", stars: 5, text: "Finally a baby monitor that works on our terrible rural Wi-Fi. Audio fallback is a lifesaver at 2AM." },
@@ -90,6 +94,44 @@ const Landing = () => {
                 <Star key={i} className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
               ))}
               <span className="ml-1">4.8/5 rating</span>
+            </div>
+          </div>
+
+          {/* QR Code Install Section */}
+          <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 md:p-8">
+            <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10">
+              <div className="flex-shrink-0">
+                <div className="bg-white p-4 rounded-2xl shadow-lg">
+                  <QRCodeSVG value={APP_URL} size={180} />
+                </div>
+              </div>
+              <div className="text-center md:text-left space-y-3">
+                <div className="flex items-center justify-center md:justify-start gap-2">
+                  <Smartphone className="h-5 w-5 text-[hsl(var(--brand-blue-light))]" />
+                  <h3 className="text-xl font-bold">Install on Your Phone</h3>
+                </div>
+                <p className="text-sm text-primary-foreground/60 max-w-sm">
+                  Scan this QR code with your phone camera to instantly install BabyCam.io — no app store needed.
+                </p>
+                <div className="flex items-center gap-2 max-w-sm mx-auto md:mx-0">
+                  <input
+                    readOnly
+                    value={APP_URL}
+                    className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-primary-foreground"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/20 text-primary-foreground hover:bg-white/10"
+                    onClick={() => {
+                      navigator.clipboard.writeText(APP_URL);
+                      toast.success("Link copied!");
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
