@@ -129,8 +129,8 @@ Write-Host "   ✅ Synced`n" -ForegroundColor Green
 Write-Host "🔧 Patching Java compatibility..." -ForegroundColor Yellow
 $gradleProps = "android\gradle.properties"
 $propsContent = Get-Content $gradleProps -Raw -ErrorAction SilentlyContinue
-if ($propsContent -notmatch "sourceCompatibility") {
-    Add-Content $gradleProps "`norg.gradle.java.home=$env:JAVA_HOME"
+if ($propsContent -notmatch "patched_java17") {
+    Add-Content $gradleProps "`n# patched_java17"
     # Patch capacitor-android build.gradle to use Java 17
     $capBuildGradle = "android\capacitor-android\build.gradle"
     if (Test-Path $capBuildGradle) {
