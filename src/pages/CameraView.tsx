@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Video, VideoOff, Mic, MicOff, Wifi, WifiOff, Loader2, RefreshCw,
   Signal, SignalLow, SignalMedium, SignalHigh, Volume2, Activity, Circle, WifiOff as WifiOffIcon,
+  Share2, QrCode, Copy, Check, X,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
 import { useMotionDetection } from "@/hooks/use-motion-detection";
@@ -45,7 +47,8 @@ const CameraView = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerRef = useRef<number | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-
+  const [showShareQR, setShowShareQR] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTimeLeft, setRecordingTimeLeft] = useState(0);
@@ -379,9 +382,51 @@ const CameraView = () => {
   const isConnected = connectionState === ConnectionState.Connected;
   const isReconnecting = connectionState === ConnectionState.Reconnecting;
   const friendlyName = roomName?.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ") || "Room";
+  const viewerUrl = `${window.location.origin}/viewer/${roomName}`;
+
+  const copyViewerLink = () => {
+    navigator.clipboard.writeText(viewerUrl);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  const nativeShare = () => {
+    if (typeof navigator.share === "function") {
+      navigator.share({
+        title: `BabyCam - ${friendlyName}`,
+        text: `Watch my baby camera live!`,
+        url: viewerUrl,
+      }).catch(() => {});
+    } else {
+      copyViewerLink();
+    }
+  };
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-black text-white select-none">
+      {/* QR Code Share Overlay */}
+      {showShareQR && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-6" onClick={() => setShowShareQR(false)}>
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setShowShareQR(false)} className="absolute top-4 right-4 text-white"><X className="h-6 w-6" /></button>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">📱 Scan to Watch</h2>
+            <p className="text-sm text-gray-500 mb-6">Anyone with this QR code can watch your camera from anywhere in the world</p>
+            <div className="flex justify-center mb-6">
+              <QRCodeSVG value={viewerUrl} size={220} level="H" includeMargin />
+            </div>
+            <p className="text-xs text-gray-400 break-all mb-4">{viewerUrl}</p>
+            <div className="flex gap-3">
+              <Button onClick={copyViewerLink} variant="outline" className="flex-1 text-gray-900">
+                {linkCopied ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <Copy className="h-4 w-4 mr-2" />}
+                {linkCopied ? "Copied!" : "Copy Link"}
+              </Button>
+              <Button onClick={nativeShare} className="flex-1">
+                <Share2 className="h-4 w-4 mr-2" /> Share
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <header className="relative z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
         <button onClick={handleDisconnect} className="touch-target flex items-center gap-2"><ArrowLeft className="h-5 w-5" /></button>
         <div className="flex items-center gap-3">
@@ -478,6 +523,9 @@ const CameraView = () => {
               {isConnecting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : error ? <RefreshCw className="mr-2 h-5 w-5" /> : <Video className="mr-2 h-5 w-5" />}
               {isConnecting ? t("camera.connecting") : error ? t("camera.retry") : t("camera.goLive")}
             </Button>
+            <Button variant="outline" size="lg" onClick={() => setShowShareQR(true)} className="border-white/30 text-white hover:bg-white/10 px-8 touch-target mt-3">
+              <QrCode className="mr-2 h-5 w-5" /> Share Viewer Link
+            </Button>
           </div>
         )}
       </div>
@@ -517,6 +565,13 @@ const CameraView = () => {
                 <Circle className={`h-5 w-5 ${isRecording ? "fill-current" : ""}`} />
               </div>
               <span className="text-[10px] opacity-60">{isRecording ? `REC ${formatTime(recordingTimeLeft)}` : "Record"}</span>
+            </button>
+            {/* Share / QR Button */}
+            <button onClick={() => setShowShareQR(true)} className="touch-target flex flex-col items-center gap-1.5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/80">
+                <QrCode className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] opacity-60">Share</span>
             </button>
             <button onClick={handleDisconnect} className="touch-target flex flex-col items-center gap-1.5">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-600/30">

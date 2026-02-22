@@ -108,10 +108,11 @@ const Dashboard = () => {
   };
 
   const copyRoomCode = (roomName: string) => {
-    navigator.clipboard.writeText(roomName);
+    const viewerUrl = `${window.location.origin}/viewer/${roomName}`;
+    navigator.clipboard.writeText(viewerUrl);
     setCopiedId(roomName);
     setTimeout(() => setCopiedId(null), 2000);
-    toast({ title: t("dashboard.roomCodeCopied"), description: t("dashboard.shareWithViewers") });
+    toast({ title: "Viewer link copied!", description: "Send this link to anyone to let them watch." });
   };
 
   const handleLogout = async () => {
