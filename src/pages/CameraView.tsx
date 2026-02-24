@@ -405,7 +405,7 @@ const CameraView = () => {
     if (typeof navigator.share === "function") {
       navigator.share({
         title: `BabyCam - ${friendlyName}`,
-        text: `Watch my baby camera live!`,
+        text: `Watch my baby camera live! Tap this link on your Android phone:`,
         url: viewerUrl,
       }).catch(() => {});
     } else {

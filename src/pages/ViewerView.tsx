@@ -177,7 +177,7 @@ const ViewerView = () => {
 
   const nativeShare = () => {
     if (typeof navigator.share === "function") {
-      navigator.share({ title: `BabyCam - ${friendlyName}`, text: `Watch baby camera "${friendlyName}" live!`, url: viewerUrl }).catch(() => {});
+      navigator.share({ title: `BabyCam - ${friendlyName}`, text: `Watch baby camera "${friendlyName}" live! Tap this link on your Android phone:`, url: viewerUrl }).catch(() => {});
     } else {
       copyViewerLink();
     }
