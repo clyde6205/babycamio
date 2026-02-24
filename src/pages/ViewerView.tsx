@@ -192,10 +192,14 @@ const ViewerView = () => {
             <button onClick={() => setShowShareQR(false)} className="absolute top-4 right-4 text-gray-400"><X className="h-6 w-6" /></button>
             <h2 className="text-xl font-bold text-gray-900 mb-1">📱 Share This Camera</h2>
             <p className="text-sm text-gray-500 mb-4">Send this link — receiver taps → instant live view</p>
-            <div className="grid grid-cols-4 gap-3 mb-5">
+            <div className="grid grid-cols-5 gap-2 mb-5">
               <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Watch my baby camera live!\n${viewerUrl}`)}`, "_blank")} className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors">
                 <div className="h-12 w-12 rounded-full bg-green-500 flex items-center justify-center"><MessageCircle className="h-6 w-6 text-white" /></div>
                 <span className="text-[11px] font-medium text-gray-700">WhatsApp</span>
+              </button>
+              <button onClick={() => window.open(`fb-messenger://share/?link=${encodeURIComponent(viewerUrl)}`, "_self")} className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors">
+                <div className="h-12 w-12 rounded-full bg-[#0084FF] flex items-center justify-center"><MessageCircle className="h-6 w-6 text-white" /></div>
+                <span className="text-[11px] font-medium text-gray-700">Messenger</span>
               </button>
               <button onClick={() => window.open(`sms:?body=${encodeURIComponent(`Watch my baby camera live! ${viewerUrl}`)}`, "_self")} className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors">
                 <div className="h-12 w-12 rounded-full bg-blue-500 flex items-center justify-center"><MessageCircle className="h-6 w-6 text-white" /></div>
