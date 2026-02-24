@@ -177,7 +177,7 @@ const ShareRecordingDialog = ({ recordingId, recordingName, filePath }: ShareRec
           {/* Share via SMS — Worldwide via Twilio + Local fallback */}
           {shareLink && (
             <SmsSender
-              defaultMessage={`Check out this recording from BabyCam.io!\n\n${shareLink}\n\nGet the app: https://babycamio.lovable.app/install`}
+              defaultMessage={`Check out this recording from BabyCam.io!\n\n${shareLink}`}
             />
           )}
 

@@ -206,7 +206,7 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
 
           {/* Share via SMS — Worldwide via Twilio + Local fallback */}
           <SmsSender
-            defaultMessage={`Hey! I'm sharing my BabyCam room "${friendlyName}" with you. Watch live here: https://babycamio.lovable.app/viewer/${roomName}\n\nDownload the app: https://babycamio.lovable.app/install`}
+            defaultMessage={`Watch my baby camera "${friendlyName}" live now: https://babycamio.lovable.app/viewer/${roomName}`}
           />
 
           {/* Native Share */}
