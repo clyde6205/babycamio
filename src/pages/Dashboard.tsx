@@ -252,7 +252,7 @@ const Dashboard = () => {
                     onClick={() => {
                       const link = `https://babycamio.lovable.app/viewer/${room.room_name}`;
                       if (navigator.share) {
-                        navigator.share({ title: "BabyCam", text: "Watch my baby camera live!", url: link }).catch(() => {});
+                        navigator.share({ title: "BabyCam", text: "Watch my baby camera live! Tap this link on your Android phone:", url: link }).catch(() => {});
                       } else {
                         navigator.clipboard.writeText(link);
                         toast({ title: "Link copied!", description: link });

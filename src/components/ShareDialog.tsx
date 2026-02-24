@@ -217,7 +217,7 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
               onClick={() => {
                 navigator.share({
                   title: `BabyCam - ${friendlyName}`,
-                  text: `Watch my baby camera "${friendlyName}" live on BabyCam.io!`,
+                  text: `Watch my baby camera "${friendlyName}" live! Tap this link on your Android phone:`,
                   url: `https://babycamio.lovable.app/viewer/${roomName}`,
                 }).catch(() => {});
               }}
