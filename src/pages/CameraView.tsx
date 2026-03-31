@@ -551,7 +551,7 @@ const CameraView = () => {
               if (error) { retry(); return; }
               try {
                 console.log("[CameraView] Acquiring camera in direct click handler…");
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
                 console.log("[CameraView] ✅ Camera acquired! Showing local preview…");
                 if (videoRef.current) {
                   videoRef.current.srcObject = stream;
