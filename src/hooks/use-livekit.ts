@@ -612,3 +612,9 @@ export const useLiveKit = ({
     isConnecting,
     error,
     connect: connectToRoom,
+
+  disconnect,
+  retry,
+  audioOnly,
+  };
+};
