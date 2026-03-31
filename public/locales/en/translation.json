@@ -89,7 +89,13 @@
     "ready4k": "4K Ultra HD ready",
     "readyHd": "Full HD ready",
     "readyStandard": "Standard quality",
-    "readyLowBandwidth": "Low bandwidth mode"
+    "readyLowBandwidth": "Low bandwidth mode",
+    "motionDetected": "Motion Detected!",
+    "activityLevel": "Activity level:",
+    "autoRecord": "Auto-record",
+    "motion": "Motion",
+    "noMotion": "No Motion",
+    "record": "Record"
   },
   "viewer": {
     "watchLive": "Watch Live",
@@ -101,7 +107,16 @@
     "unmute": "Unmute",
     "sound": "Sound",
     "fullscreen": "Fullscreen",
-    "leave": "Leave"
+    "leave": "Leave",
+    "motionDetected": "Motion Detected!",
+    "activityLevel": "Activity level:",
+    "babyCrying": "Baby is Crying!",
+    "babyFussing": "Baby is Fussing",
+    "checkBaby": "Check on your little one",
+    "cameraHealthy": "Camera healthy",
+    "cameraOffline": "Camera offline  last seen",
+    "cameraBattery": "Camera battery low",
+    "record": "Record"
   },
   "measure": {
     "title": "Measure Tool",
@@ -162,8 +177,23 @@
     "bankGrade": "Bank-Grade Security",
     "available190": "Available in 190+ Countries",
     "support247": "24/7 Support",
-    "freeFeatures": ["1 Camera Room", "720p Streaming", "Ad-Supported", "Basic Alerts", "Community Support"],
-    "proFeatures": ["Unlimited Rooms", "4K Ultra HD Streaming", "No Ads Ever", "AI Cry Detection", "Two-Way Audio", "Priority Support 24/7", "Multi-Viewer Access", "Cloud Recording (Coming Soon)"],
+    "freeFeatures": [
+      "1 Camera Room",
+      "720p Streaming",
+      "Ad-Supported",
+      "Basic Alerts",
+      "Community Support"
+    ],
+    "proFeatures": [
+      "Unlimited Rooms",
+      "4K Ultra HD Streaming",
+      "No Ads Ever",
+      "AI Cry Detection",
+      "Two-Way Audio",
+      "Priority Support 24/7",
+      "Multi-Viewer Access",
+      "Cloud Recording (Coming Soon)"
+    ],
     "creditDebit": "Credit/Debit Card",
     "paypal": "PayPal",
     "gcashMaya": "GCash / Maya",
@@ -256,7 +286,12 @@
     "infoCollect": "1. Information We Collect",
     "infoCollectText": "We collect your email address, display name, and device information when you create an account. We do not access, store, or process the content of your video streams.",
     "howWeUse": "2. How We Use Your Information",
-    "howWeUseList": ["To provide and maintain the Service", "To manage your account and subscription", "To send important service notifications", "To improve the Service quality and performance"],
+    "howWeUseList": [
+      "To provide and maintain the Service",
+      "To manage your account and subscription",
+      "To send important service notifications",
+      "To improve the Service quality and performance"
+    ],
     "videoStreamData": "3. Video Stream Data",
     "videoStreamDataText": "All video and audio streams are peer-to-peer encrypted. BabyCam.io acts as a signaling intermediary only. Stream content is never recorded, analyzed, or stored on our servers unless you enable cloud recording (Pro feature).",
     "paymentInfo": "4. Payment Information",
@@ -290,7 +325,12 @@
     "thirdPartyText": "BabyCam.io integrates with third-party services including LiveKit (streaming), Stripe, PayPal, PayMongo, and M-Pesa (payments). We are not responsible for the availability, accuracy, or security of these third-party services.",
     "userResponsibility": "User Responsibility",
     "userResponsibilityText": "You are solely responsible for:",
-    "userResponsibilityList": ["Ensuring your use of the Service complies with local laws and regulations", "Obtaining consent from all individuals who may be recorded or monitored", "Maintaining the security of your account and shared access codes", "The physical safety and welfare of any individuals being monitored"],
+    "userResponsibilityList": [
+      "Ensuring your use of the Service complies with local laws and regulations",
+      "Obtaining consent from all individuals who may be recorded or monitored",
+      "Maintaining the security of your account and shared access codes",
+      "The physical safety and welfare of any individuals being monitored"
+    ],
     "limitationLiability": "Limitation of Liability",
     "limitationLiabilityText": "TO THE MAXIMUM EXTENT PERMITTED BY LAW, BABYCAM.IO, ITS FOUNDERS, EMPLOYEES, AND AFFILIATES SHALL NOT BE LIABLE FOR ANY INJURY, LOSS, CLAIM, OR DAMAGE OF ANY KIND ARISING FROM OR RELATED TO YOUR USE OF THE SERVICE.",
     "indemnification": "Indemnification",
