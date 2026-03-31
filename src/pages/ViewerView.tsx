@@ -166,7 +166,7 @@ const ViewerView = () => {
   const isConnected = connectionState === ConnectionState.Connected;
   const isReconnecting = connectionState === ConnectionState.Reconnecting;
   const friendlyName = roomName?.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ") || "Room";
-  const appBase = "https://babycamio.lovable.app";
+  const appBase = "https://babycam.io";
   const viewerUrl = `${appBase}/viewer/${roomName}`;
 
   const copyViewerLink = () => {
