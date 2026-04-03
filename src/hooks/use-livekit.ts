@@ -87,6 +87,12 @@ const getRoomOptions = (quality: NetworkQuality, isPublisher: boolean, connType:
     adaptiveStream: true,
     dynacast: true,
     disconnectOnPageLeave: false,
+    // Audio processing to eliminate echo, noise, and auto-gain
+    audioCaptureDefaults: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
     reconnectPolicy: {
       nextRetryDelayInMs: (context) => {
         const isMobile = connType === "cellular" || connType === "bluetooth";
@@ -100,10 +106,8 @@ const getRoomOptions = (quality: NetworkQuality, isPublisher: boolean, connType:
   };
 
   if (!isPublisher) {
-    // Viewer: prefer lower latency over quality
     return {
       ...base,
-      // Prioritize low latency for real-time monitoring
       adaptiveStream: true,
     };
   }
@@ -378,14 +382,15 @@ export const useLiveKit = ({
     // or try to acquire here as fallback (for auto-reconnect scenarios)
     let preAcquiredStream: MediaStream | undefined = externalStream;
     if (!preAcquiredStream && isPublisher) {
+      const audioConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
       try {
         console.log("[LiveKit] No external stream — trying getUserMedia (auto-reconnect)…");
-        preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: audioConstraints });
       } catch (e: any) {
         console.warn("[LiveKit] getUserMedia fallback failed:", e.message);
         try { preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); } catch {}
         if (!preAcquiredStream) {
-          try { preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true }); } catch {}
+          try { preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: audioConstraints }); } catch {}
         }
       }
     }
