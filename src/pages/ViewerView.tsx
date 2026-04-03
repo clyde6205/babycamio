@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Eye, Volume2, VolumeX, Loader2, RefreshCw, Maximize2, Minimize2,
   SignalHigh, SignalMedium, SignalLow, WifiOff, Activity, Baby, Heart, BatteryWarning, WifiOff as WifiOffIcon2,
-  Share2, Copy, Check, QrCode, X, MessageCircle, Mail, Send,
+  Share2, Copy, Check, QrCode, X, MessageCircle, Mail, Send, Circle,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
@@ -15,6 +15,7 @@ import TalkbackButton from "@/components/TalkbackButton";
 import NightVisionToggle from "@/components/NightVisionToggle";
 import LullabyPlayer from "@/components/LullabyPlayer";
 import ConnectionStatus from "@/components/ConnectionStatus";
+import { useToast } from "@/hooks/use-toast";
 
 const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
   switch (quality) {
@@ -40,11 +41,21 @@ const ViewerView = () => {
   const [linkCopied, setLinkCopied] = useState(false);
   const [displayName, setDisplayName] = useState("Viewer");
   const containerRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const [motionAlert, setMotionAlert] = useState(false);
   const [motionLevel, setMotionLevel] = useState(0);
   const [cryAlert, setCryAlert] = useState<string | null>(null);
   const motionTimeoutRef = useRef<number | null>(null);
+
+  // Recording state for viewer
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTimeLeft, setRecordingTimeLeft] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<number | null>(null);
+  const countdownRef = useRef<number | null>(null);
+  const VIEWER_RECORD_DURATION = 5 * 60; // 5 minutes max
 
   // Camera health state
   const [cameraHealth, setCameraHealth] = useState<{
@@ -156,13 +167,96 @@ const ViewerView = () => {
     return () => { room.removeAllListeners(RoomEvent.TrackSubscribed); room.removeAllListeners(RoomEvent.TrackUnsubscribed); };
   }, [room, connectionState]);
 
+  // ── Viewer Recording: captures the remote video+audio stream ──
+  const startViewerRecording = useCallback(() => {
+    if (isRecording || !videoRef.current) return;
+    const videoEl = videoRef.current;
+    // Capture stream from the video element (remote stream)
+    let stream: MediaStream | null = null;
+    if (videoEl.srcObject instanceof MediaStream) {
+      stream = videoEl.srcObject;
+    } else if ((videoEl as any).captureStream) {
+      stream = (videoEl as any).captureStream();
+    }
+    // Also capture audio from audioRef
+    if (audioRef.current?.srcObject instanceof MediaStream) {
+      const audioTracks = (audioRef.current.srcObject as MediaStream).getAudioTracks();
+      if (stream && audioTracks.length > 0) {
+        audioTracks.forEach(t => stream!.addTrack(t.clone()));
+      }
+    }
+    if (!stream || stream.getTracks().length === 0) {
+      toast({ title: "Cannot record", description: "No video stream available yet.", variant: "destructive" });
+      return;
+    }
+    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+      ? "video/webm;codecs=vp9,opus"
+      : MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "video/mp4";
+    try {
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
+      recordedChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+        const ext = mimeType.includes("webm") ? "webm" : "mp4";
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        const fileName = `babycam-viewer-${ts}.${ext}`;
+        const sizeMB = (blob.size / 1024 / 1024).toFixed(1);
+        // Download locally on viewer's device
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = fileName; a.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "Recording saved 📹", description: `${sizeMB} MB downloaded to your device` });
+      };
+      recorder.start(1000);
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingTimeLeft(VIEWER_RECORD_DURATION);
+      countdownRef.current = window.setInterval(() => {
+        setRecordingTimeLeft((prev) => prev <= 1 ? 0 : prev - 1);
+      }, 1000);
+      recordingTimerRef.current = window.setTimeout(() => stopViewerRecording(), VIEWER_RECORD_DURATION * 1000);
+      toast({ title: "Recording started", description: "Tap again to stop" });
+    } catch (err) {
+      console.error("[ViewerRecord] Failed:", err);
+      toast({ title: "Recording failed", description: "Your device may not support recording.", variant: "destructive" });
+    }
+  }, [isRecording, toast]);
+
+  const stopViewerRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
+    mediaRecorderRef.current = null;
+    setIsRecording(false); setRecordingTimeLeft(0);
+    if (recordingTimerRef.current) { clearTimeout(recordingTimerRef.current); recordingTimerRef.current = null; }
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+  }, []);
+
+  const handleViewerRecord = useCallback(() => {
+    if (isRecording) stopViewerRecording(); else startViewerRecording();
+  }, [isRecording, stopViewerRecording, startViewerRecording]);
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
+      if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60); const sec = s % 60;
+    return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+  };
+
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) { containerRef.current.requestFullscreen?.(); setIsFullscreen(true); }
     else { document.exitFullscreen?.(); setIsFullscreen(false); }
   }, []);
 
-  const handleDisconnect = () => { disconnect(); navigate("/dashboard"); };
+  const handleDisconnect = () => { stopViewerRecording(); disconnect(); navigate("/dashboard"); };
   const isConnected = connectionState === ConnectionState.Connected;
   const isReconnecting = connectionState === ConnectionState.Reconnecting;
   const friendlyName = roomName?.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ") || "Room";
@@ -347,7 +441,14 @@ const ViewerView = () => {
 
       {isConnected && (
         <div className="safe-bottom bg-gradient-to-t from-black/90 to-transparent px-6 pb-4 pt-6">
-          <div className="flex items-center justify-center gap-5">
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            {/* Record button */}
+            <button onClick={handleViewerRecord} className="touch-target flex flex-col items-center gap-1.5">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${isRecording ? "bg-red-600 animate-pulse" : "bg-white/15"}`}>
+                <Circle className={`h-5 w-5 ${isRecording ? "fill-white" : ""}`} />
+              </div>
+              <span className="text-[10px] opacity-60">{isRecording ? formatTime(recordingTimeLeft) : "Record"}</span>
+            </button>
             <button onClick={() => setMuted(!muted)} className="touch-target flex flex-col items-center gap-1.5">
               <div className={`flex h-12 w-12 items-center justify-center rounded-full ${muted ? "bg-red-500/80" : "bg-white/15"}`}>
                 {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}

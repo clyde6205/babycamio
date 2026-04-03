@@ -86,51 +86,67 @@ const getRoomOptions = (quality: NetworkQuality, isPublisher: boolean, connType:
   const base: RoomOptions = {
     adaptiveStream: true,
     dynacast: true,
-    disconnectOnPageLeave: false, // We manage lifecycle manually for persistence
+    disconnectOnPageLeave: false,
     reconnectPolicy: {
       nextRetryDelayInMs: (context) => {
         const isMobile = connType === "cellular" || connType === "bluetooth";
         const baseDelay = isMobile ? 200 : 300;
         const maxDelay = isMobile ? 5000 : 8000;
-        const maxRetries = 100; // Effectively never give up
+        const maxRetries = 100;
         const delay = Math.min(baseDelay * Math.pow(1.3, context.retryCount), maxDelay);
         return context.retryCount < maxRetries ? delay : null;
       },
     },
   };
 
-  if (!isPublisher) return base;
+  if (!isPublisher) {
+    // Viewer: prefer lower latency over quality
+    return {
+      ...base,
+      // Prioritize low latency for real-time monitoring
+      adaptiveStream: true,
+    };
+  }
 
-  // Quality presets for publishers
+  // Quality presets for publishers — higher bitrates to reduce blur
   const presets: Record<string, Partial<RoomOptions>> = {
     excellent: {
-      videoCaptureDefaults: { resolution: { width: 3840, height: 2160, frameRate: 30 } },
-      publishDefaults: {
-        videoSimulcastLayers: [VideoPresets.h2160, VideoPresets.h1080, VideoPresets.h720, VideoPresets.h360],
-        videoCodec: "vp8", dtx: true, red: true,
-      },
-    },
-    good: {
-      videoCaptureDefaults: { resolution: { width: 1920, height: 1080, frameRate: 24 } },
+      videoCaptureDefaults: { resolution: { width: 1920, height: 1080, frameRate: 30 } },
       publishDefaults: {
         videoSimulcastLayers: [VideoPresets.h1080, VideoPresets.h720, VideoPresets.h360],
         videoCodec: "vp8", dtx: true, red: true,
+        videoEncoding: { maxBitrate: 4_000_000, maxFramerate: 30 },
+      },
+    },
+    good: {
+      videoCaptureDefaults: { resolution: { width: 1280, height: 720, frameRate: 30 } },
+      publishDefaults: {
+        videoSimulcastLayers: [VideoPresets.h720, VideoPresets.h360],
+        videoCodec: "vp8", dtx: true, red: true,
+        videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 },
       },
     },
     fair: {
-      videoCaptureDefaults: { resolution: { width: 640, height: 480, frameRate: 15 } },
+      videoCaptureDefaults: { resolution: { width: 640, height: 480, frameRate: 24 } },
       publishDefaults: {
         videoSimulcastLayers: [VideoPresets.h540, VideoPresets.h180],
         videoCodec: "vp8", dtx: true, red: true,
+        videoEncoding: { maxBitrate: 1_200_000, maxFramerate: 24 },
       },
     },
     poor: {
-      videoCaptureDefaults: { resolution: { width: 320, height: 240, frameRate: 10 } },
-      publishDefaults: { videoCodec: "vp8", dtx: true, red: true },
+      videoCaptureDefaults: { resolution: { width: 480, height: 360, frameRate: 15 } },
+      publishDefaults: {
+        videoCodec: "vp8", dtx: true, red: true,
+        videoEncoding: { maxBitrate: 500_000, maxFramerate: 15 },
+      },
     },
     offline: {
-      videoCaptureDefaults: { resolution: { width: 320, height: 240, frameRate: 5 } },
-      publishDefaults: { videoCodec: "vp8", dtx: true, red: true },
+      videoCaptureDefaults: { resolution: { width: 320, height: 240, frameRate: 10 } },
+      publishDefaults: {
+        videoCodec: "vp8", dtx: true, red: true,
+        videoEncoding: { maxBitrate: 200_000, maxFramerate: 10 },
+      },
     },
   };
 
