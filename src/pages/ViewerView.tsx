@@ -441,7 +441,14 @@ const ViewerView = () => {
 
       {isConnected && (
         <div className="safe-bottom bg-gradient-to-t from-black/90 to-transparent px-6 pb-4 pt-6">
-          <div className="flex items-center justify-center gap-5">
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            {/* Record button */}
+            <button onClick={handleViewerRecord} className="touch-target flex flex-col items-center gap-1.5">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${isRecording ? "bg-red-600 animate-pulse" : "bg-white/15"}`}>
+                <Circle className={`h-5 w-5 ${isRecording ? "fill-white" : ""}`} />
+              </div>
+              <span className="text-[10px] opacity-60">{isRecording ? formatTime(recordingTimeLeft) : "Record"}</span>
+            </button>
             <button onClick={() => setMuted(!muted)} className="touch-target flex flex-col items-center gap-1.5">
               <div className={`flex h-12 w-12 items-center justify-center rounded-full ${muted ? "bg-red-500/80" : "bg-white/15"}`}>
                 {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
