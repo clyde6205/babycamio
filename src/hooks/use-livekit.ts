@@ -87,6 +87,12 @@ const getRoomOptions = (quality: NetworkQuality, isPublisher: boolean, connType:
     adaptiveStream: true,
     dynacast: true,
     disconnectOnPageLeave: false,
+    // Audio processing to eliminate echo, noise, and auto-gain
+    audioCaptureDefaults: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
     reconnectPolicy: {
       nextRetryDelayInMs: (context) => {
         const isMobile = connType === "cellular" || connType === "bluetooth";
@@ -100,10 +106,8 @@ const getRoomOptions = (quality: NetworkQuality, isPublisher: boolean, connType:
   };
 
   if (!isPublisher) {
-    // Viewer: prefer lower latency over quality
     return {
       ...base,
-      // Prioritize low latency for real-time monitoring
       adaptiveStream: true,
     };
   }
