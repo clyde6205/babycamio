@@ -382,14 +382,15 @@ export const useLiveKit = ({
     // or try to acquire here as fallback (for auto-reconnect scenarios)
     let preAcquiredStream: MediaStream | undefined = externalStream;
     if (!preAcquiredStream && isPublisher) {
+      const audioConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
       try {
         console.log("[LiveKit] No external stream — trying getUserMedia (auto-reconnect)…");
-        preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: audioConstraints });
       } catch (e: any) {
         console.warn("[LiveKit] getUserMedia fallback failed:", e.message);
         try { preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); } catch {}
         if (!preAcquiredStream) {
-          try { preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true }); } catch {}
+          try { preAcquiredStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: audioConstraints }); } catch {}
         }
       }
     }
