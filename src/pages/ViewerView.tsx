@@ -41,11 +41,21 @@ const ViewerView = () => {
   const [linkCopied, setLinkCopied] = useState(false);
   const [displayName, setDisplayName] = useState("Viewer");
   const containerRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const [motionAlert, setMotionAlert] = useState(false);
   const [motionLevel, setMotionLevel] = useState(0);
   const [cryAlert, setCryAlert] = useState<string | null>(null);
   const motionTimeoutRef = useRef<number | null>(null);
+
+  // Recording state for viewer
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTimeLeft, setRecordingTimeLeft] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<number | null>(null);
+  const countdownRef = useRef<number | null>(null);
+  const VIEWER_RECORD_DURATION = 5 * 60; // 5 minutes max
 
   // Camera health state
   const [cameraHealth, setCameraHealth] = useState<{
