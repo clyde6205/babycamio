@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Eye, Volume2, VolumeX, Loader2, RefreshCw, Maximize2, Minimize2,
   SignalHigh, SignalMedium, SignalLow, WifiOff, Activity, Baby, Heart, BatteryWarning, WifiOff as WifiOffIcon2,
-  Share2, Copy, Check, QrCode, X, MessageCircle, Mail, Send,
+  Share2, Copy, Check, QrCode, X, MessageCircle, Mail, Send, Circle,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
@@ -15,6 +15,7 @@ import TalkbackButton from "@/components/TalkbackButton";
 import NightVisionToggle from "@/components/NightVisionToggle";
 import LullabyPlayer from "@/components/LullabyPlayer";
 import ConnectionStatus from "@/components/ConnectionStatus";
+import { useToast } from "@/hooks/use-toast";
 
 const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
   switch (quality) {
