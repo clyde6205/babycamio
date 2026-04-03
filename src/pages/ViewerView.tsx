@@ -167,13 +167,96 @@ const ViewerView = () => {
     return () => { room.removeAllListeners(RoomEvent.TrackSubscribed); room.removeAllListeners(RoomEvent.TrackUnsubscribed); };
   }, [room, connectionState]);
 
+  // ── Viewer Recording: captures the remote video+audio stream ──
+  const startViewerRecording = useCallback(() => {
+    if (isRecording || !videoRef.current) return;
+    const videoEl = videoRef.current;
+    // Capture stream from the video element (remote stream)
+    let stream: MediaStream | null = null;
+    if (videoEl.srcObject instanceof MediaStream) {
+      stream = videoEl.srcObject;
+    } else if ((videoEl as any).captureStream) {
+      stream = (videoEl as any).captureStream();
+    }
+    // Also capture audio from audioRef
+    if (audioRef.current?.srcObject instanceof MediaStream) {
+      const audioTracks = (audioRef.current.srcObject as MediaStream).getAudioTracks();
+      if (stream && audioTracks.length > 0) {
+        audioTracks.forEach(t => stream!.addTrack(t.clone()));
+      }
+    }
+    if (!stream || stream.getTracks().length === 0) {
+      toast({ title: "Cannot record", description: "No video stream available yet.", variant: "destructive" });
+      return;
+    }
+    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+      ? "video/webm;codecs=vp9,opus"
+      : MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "video/mp4";
+    try {
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
+      recordedChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+        const ext = mimeType.includes("webm") ? "webm" : "mp4";
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        const fileName = `babycam-viewer-${ts}.${ext}`;
+        const sizeMB = (blob.size / 1024 / 1024).toFixed(1);
+        // Download locally on viewer's device
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = fileName; a.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "Recording saved 📹", description: `${sizeMB} MB downloaded to your device` });
+      };
+      recorder.start(1000);
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingTimeLeft(VIEWER_RECORD_DURATION);
+      countdownRef.current = window.setInterval(() => {
+        setRecordingTimeLeft((prev) => prev <= 1 ? 0 : prev - 1);
+      }, 1000);
+      recordingTimerRef.current = window.setTimeout(() => stopViewerRecording(), VIEWER_RECORD_DURATION * 1000);
+      toast({ title: "Recording started", description: "Tap again to stop" });
+    } catch (err) {
+      console.error("[ViewerRecord] Failed:", err);
+      toast({ title: "Recording failed", description: "Your device may not support recording.", variant: "destructive" });
+    }
+  }, [isRecording, toast]);
+
+  const stopViewerRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
+    mediaRecorderRef.current = null;
+    setIsRecording(false); setRecordingTimeLeft(0);
+    if (recordingTimerRef.current) { clearTimeout(recordingTimerRef.current); recordingTimerRef.current = null; }
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+  }, []);
+
+  const handleViewerRecord = useCallback(() => {
+    if (isRecording) stopViewerRecording(); else startViewerRecording();
+  }, [isRecording, stopViewerRecording, startViewerRecording]);
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
+      if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60); const sec = s % 60;
+    return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+  };
+
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) { containerRef.current.requestFullscreen?.(); setIsFullscreen(true); }
     else { document.exitFullscreen?.(); setIsFullscreen(false); }
   }, []);
 
-  const handleDisconnect = () => { disconnect(); navigate("/dashboard"); };
+  const handleDisconnect = () => { stopViewerRecording(); disconnect(); navigate("/dashboard"); };
   const isConnected = connectionState === ConnectionState.Connected;
   const isReconnecting = connectionState === ConnectionState.Reconnecting;
   const friendlyName = roomName?.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ") || "Room";
