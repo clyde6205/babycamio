@@ -38,7 +38,7 @@ const Auth = ({ mode }: AuthProps) => {
         const { error, data } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { display_name: displayName } },
+          options: { data: { display_name: displayName }, emailRedirectTo: `${window.location.origin}/dashboard` },
         });
         if (error) throw error;
         if (data.session) {
