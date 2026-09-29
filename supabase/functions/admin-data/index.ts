@@ -85,15 +85,70 @@ serve(async (req) => {
       });
     }
 
+    const json = (d: unknown, status = 200) => new Response(JSON.stringify(d), {
+      status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+    if (body.action === "set_plan") {
+      const { userId, plan, months } = body;
+      if (!userId || !["free", "pro"].includes(plan)) return json({ error: "Invalid input" }, 400);
+      const end = plan === "pro" ? new Date(Date.now() + (Number(months) || 1) * 30 * 86400000).toISOString() : null;
+      const { data: existing } = await supabase.from("subscriptions").select("id").eq("user_id", userId).maybeSingle();
+      const row = { plan, status: "active", payment_provider: plan === "pro" ? "admin_grant" : null, current_period_end: end };
+      const { error } = existing
+        ? await supabase.from("subscriptions").update(row).eq("user_id", userId)
+        : await supabase.from("subscriptions").insert({ user_id: userId, ...row });
+      if (error) throw error;
+      return json({ success: true });
+    }
+
+    if (body.action === "set_admin") {
+      const { userId, grant } = body;
+      if (!userId) return json({ error: "Invalid input" }, 400);
+      if (!grant && userId === user.id) return json({ error: "You cannot remove your own admin role" }, 400);
+      const { error } = grant
+        ? await supabase.from("user_roles").upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" })
+        : await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", "admin");
+      if (error) throw error;
+      return json({ success: true });
+    }
+
+    if (body.action === "set_banned") {
+      const { userId, banned } = body;
+      if (!userId || userId === user.id) return json({ error: "Invalid input" }, 400);
+      const { error } = await supabase.auth.admin.updateUserById(userId, { ban_duration: banned ? "876000h" : "none" });
+      if (error) throw error;
+      return json({ success: true });
+    }
+
+    if (body.action === "set_room_active") {
+      const { roomId, active } = body;
+      const { error } = await supabase.from("rooms").update({ is_active: !!active }).eq("id", roomId);
+      if (error) throw error;
+      return json({ success: true });
+    }
+
+    if (body.action === "delete_room") {
+      const { error } = await supabase.from("rooms").delete().eq("id", body.roomId);
+      if (error) throw error;
+      return json({ success: true });
+    }
+
     // Default: fetch all data
-    const [profilesRes, roomsRes, subsRes, motionRes, userCameraRes, referralsRes] = await Promise.all([
-      supabase.from("profiles").select("*").order("created_at", { ascending: false }).limit(500),
-      supabase.from("rooms").select("*").order("created_at", { ascending: false }).limit(500),
-      supabase.from("subscriptions").select("*").order("created_at", { ascending: false }).limit(500),
+    const [profilesRes, roomsRes, subsRes, motionRes, userCameraRes, referralsRes, rolesRes, authRes] = await Promise.all([
+      supabase.from("profiles").select("*").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("rooms").select("*").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("subscriptions").select("*").order("created_at", { ascending: false }).limit(1000),
       supabase.from("app_settings").select("setting_value").eq("setting_key", "motion_recording").single(),
-      supabase.from("user_camera_settings").select("*").order("updated_at", { ascending: false }).limit(500),
-      supabase.from("referrals").select("*").order("created_at", { ascending: false }).limit(500),
+      supabase.from("user_camera_settings").select("*").order("updated_at", { ascending: false }).limit(1000),
+      supabase.from("referrals").select("*").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("user_roles").select("user_id, role"),
+      supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     ]);
+    const authUsers = (authRes.data?.users || []).map((u: any) => ({
+      id: u.id, email: u.email, last_sign_in_at: u.last_sign_in_at, confirmed: !!u.email_confirmed_at,
+      banned: !!u.banned_until && new Date(u.banned_until) > new Date(),
+    }));
 
     const profiles = profilesRes.data || [];
     const rooms = roomsRes.data || [];
@@ -115,6 +170,8 @@ serve(async (req) => {
         motionSettings: motionRes.data?.setting_value || null,
         userCameraSettings: userCameraRes.data || [],
         referrals: referralsRes.data || [],
+        roles: rolesRes.data || [],
+        authUsers,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
