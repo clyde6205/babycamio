@@ -12,8 +12,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Video, ArrowLeft, Users, MonitorPlay, CreditCard, Loader2, Shield,
   Search, AlertTriangle, Activity, Save, Settings as SettingsIcon, Gift, CheckCircle2,
+  Megaphone, Film, Power, Trash2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { AdsPanel, AppConfigPanel, SponsorVideosPanel } from "@/components/admin/AdminPanels";
 
 interface RoomRow {
   id: string; room_name: string; owner_id: string; is_active: boolean; room_type: string; created_at: string;
@@ -51,8 +53,25 @@ const AdminConsole = () => {
 
   // Per-user camera settings (admin view/edit)
   const [userCameraSettings, setUserCameraSettings] = useState<any[]>([]);
+  const [roles, setRoles] = useState<{ user_id: string; role: string }[]>([]);
+  const [authUsers, setAuthUsers] = useState<{ id: string; email: string; last_sign_in_at: string | null; confirmed: boolean; banned: boolean }[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const { user: autoUser, loading: authLoading } = useAutoAuth();
+
+  useEffect(() => {
+    if (!authLoading && !autoUser) navigate("/login");
+  }, [authLoading, autoUser, navigate]);
+
+  const adminAction = async (body: Record<string, unknown>, okMsg: string) => {
+    const { data, error } = await supabase.functions.invoke("admin-data", { body });
+    if (error || data?.error) {
+      toast({ title: "Action failed", description: data?.error || error?.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: okMsg });
+    setReloadKey((k) => k + 1);
+  };
 
   useEffect(() => {
     if (authLoading || !autoUser) return;
@@ -74,6 +93,8 @@ const AdminConsole = () => {
           if (data.motionSettings) setGlobalMotion(data.motionSettings);
           if (data.userCameraSettings) setUserCameraSettings(data.userCameraSettings);
           if (data.referrals) setReferrals(data.referrals);
+          setRoles(data.roles || []);
+          setAuthUsers(data.authUsers || []);
         }
       } catch (err: any) {
         toast({ title: "Error loading data", description: err.message, variant: "destructive" });
@@ -81,7 +102,7 @@ const AdminConsole = () => {
       setLoading(false);
     };
     init();
-  }, [autoUser, authLoading, toast]);
+  }, [autoUser, authLoading, toast, reloadKey]);
 
   const saveGlobalMotionSettings = async () => {
     setSavingGlobal(true);
@@ -187,12 +208,15 @@ const AdminConsole = () => {
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("admin.searchPlaceholder")} className="pl-10" />
         </div>
 
-        <Tabs defaultValue="settings">
-          <TabsList className="mb-4 flex-wrap">
-            <TabsTrigger value="settings">
-              <SettingsIcon className="h-3.5 w-3.5 mr-1" /> Global Settings
-            </TabsTrigger>
+        <Tabs defaultValue="users">
+          <TabsList className="mb-4 flex h-auto flex-wrap">
             <TabsTrigger value="users">{t("admin.users")} ({profiles.length})</TabsTrigger>
+            <TabsTrigger value="ads"><Megaphone className="h-3.5 w-3.5 mr-1" /> Ads</TabsTrigger>
+            <TabsTrigger value="sponsors"><Film className="h-3.5 w-3.5 mr-1" /> Sponsor Videos</TabsTrigger>
+            <TabsTrigger value="app"><Power className="h-3.5 w-3.5 mr-1" /> App Control</TabsTrigger>
+            <TabsTrigger value="settings">
+              <SettingsIcon className="h-3.5 w-3.5 mr-1" /> Motion Defaults
+            </TabsTrigger>
             <TabsTrigger value="rooms">{t("admin.rooms")} ({rooms.length})</TabsTrigger>
             <TabsTrigger value="subs">{t("admin.subscriptions")} ({subscriptions.length})</TabsTrigger>
             <TabsTrigger value="camera">
@@ -369,17 +393,36 @@ const AdminConsole = () => {
             </div>
           </TabsContent>
 
+          <TabsContent value="ads"><AdsPanel /></TabsContent>
+          <TabsContent value="sponsors"><SponsorVideosPanel /></TabsContent>
+          <TabsContent value="app"><AppConfigPanel /></TabsContent>
+
           <TabsContent value="users">
             <div className="space-y-2">
-              {filteredProfiles.map((p: any) => (
-                <Card key={p.id} className="p-3 flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{p.display_name || "—"}</p>
-                    <p className="text-xs text-muted-foreground">{p.user_id}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString()}</span>
-                </Card>
-              ))}
+              {filteredProfiles.map((p: any) => {
+                const au = authUsers.find((u) => u.id === p.user_id);
+                const sub = subscriptions.find((s) => s.user_id === p.user_id);
+                const isPro = sub?.plan === "pro" && sub?.status === "active";
+                const admin = roles.some((r) => r.user_id === p.user_id && r.role === "admin");
+                return (
+                  <Card key={p.id} className="p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium">{p.display_name || "—"} {admin && <span className="ml-1 rounded bg-primary/15 px-1.5 text-xs text-primary">ADMIN</span>} {isPro && <span className="ml-1 rounded bg-accent px-1.5 text-xs">PRO</span>} {au?.banned && <span className="ml-1 rounded bg-destructive/20 px-1.5 text-xs text-destructive">BANNED</span>}</p>
+                        <p className="text-xs text-muted-foreground truncate">{au?.email || p.user_id}</p>
+                        <p className="text-xs text-muted-foreground">Joined {new Date(p.created_at).toLocaleDateString()}{au?.last_sign_in_at ? ` · last seen ${new Date(au.last_sign_in_at).toLocaleDateString()}` : ""}{au && !au.confirmed ? " · email not confirmed" : ""}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {isPro
+                        ? <Button size="sm" variant="outline" onClick={() => adminAction({ action: "set_plan", userId: p.user_id, plan: "free" }, "Set to Free")}>Remove Pro</Button>
+                        : <Button size="sm" variant="outline" onClick={() => adminAction({ action: "set_plan", userId: p.user_id, plan: "pro", months: 12 }, "Pro granted (12 months)")}>Give Pro 12mo</Button>}
+                      <Button size="sm" variant="outline" onClick={() => adminAction({ action: "set_admin", userId: p.user_id, grant: !admin }, admin ? "Admin removed" : "Admin granted")}>{admin ? "Remove admin" : "Make admin"}</Button>
+                      <Button size="sm" variant={au?.banned ? "outline" : "destructive"} onClick={() => adminAction({ action: "set_banned", userId: p.user_id, banned: !au?.banned }, au?.banned ? "User unbanned" : "User banned")}>{au?.banned ? "Unban" : "Ban"}</Button>
+                    </div>
+                  </Card>
+                );
+              })}
               {filteredProfiles.length === 0 && <p className="py-8 text-center text-muted-foreground">{t("admin.noUsersFound")}</p>}
             </div>
           </TabsContent>
@@ -387,14 +430,17 @@ const AdminConsole = () => {
           <TabsContent value="rooms">
             <div className="space-y-2">
               {rooms.map((r) => (
-                <Card key={r.id} className="p-3 flex items-center justify-between">
-                  <div>
+                <Card key={r.id} className="p-3 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
                     <p className="font-medium capitalize">{r.room_name.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")}</p>
                     <p className="text-xs text-muted-foreground">
-                      {r.is_active ? `🟢 ${t("admin.live")}` : `⚫ ${t("admin.offline")}`} · {r.room_type} · {t("admin.owner")}: {r.owner_id.slice(0, 8)}...
+                      {r.is_active ? `🟢 ${t("admin.live")}` : `⚫ ${t("admin.offline")}`} · {r.room_type} · {t("admin.owner")}: {authUsers.find((u) => u.id === r.owner_id)?.email || r.owner_id.slice(0, 8)} · {new Date(r.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <span className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</span>
+                  <div className="flex gap-1">
+                    {r.is_active && <Button size="sm" variant="outline" onClick={() => adminAction({ action: "set_room_active", roomId: r.id, active: false }, "Camera stopped")}>Stop</Button>}
+                    <Button size="icon" variant="destructive" onClick={() => confirm("Delete this camera?") && adminAction({ action: "delete_room", roomId: r.id }, "Camera deleted")}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
                 </Card>
               ))}
               {rooms.length === 0 && <p className="py-8 text-center text-muted-foreground">{t("admin.noRooms")}</p>}

@@ -1,70 +1,65 @@
 import { useEffect, useCallback } from "react";
 import { useSubscription } from "./use-subscription";
-
-// AdMob Unit IDs — replace with your production IDs
-const AD_UNIT_IDS = {
-  banner: "ca-app-pub-3940256099942544/6300978111", // Test ID — replace with real
-  interstitial: "ca-app-pub-3940256099942544/1033173712", // Test ID
-};
+import { useAppSettings } from "./use-app-settings";
 
 let admobInitialized = false;
+let viewCount = 0;
 
+/** AdMob controls, driven by the founder's Ads settings in the admin console. */
 export function useAdMob() {
-  const { isPro, loading } = useSubscription();
+  const { isPro, loading: subLoading } = useSubscription();
+  const { ads, loading: adsLoading } = useAppSettings();
+  const loading = subLoading || adsLoading;
+  const adsOn = ads.enabled && !isPro;
 
   const initAdMob = useCallback(async () => {
-    if (admobInitialized || isPro) return;
+    if (admobInitialized || !adsOn) return;
     try {
       const { AdMob } = await import("@capacitor-community/admob");
-      await AdMob.initialize({
-        initializeForTesting: true, // Set false in production
-      });
+      await AdMob.initialize({ initializeForTesting: ads.test_mode });
       admobInitialized = true;
     } catch (err) {
       console.warn("AdMob init failed (expected in browser):", err);
     }
-  }, [isPro]);
+  }, [adsOn, ads.test_mode]);
 
   const showBanner = useCallback(async () => {
-    if (isPro) return;
+    if (!adsOn || !ads.banner_enabled) return;
     try {
       const { AdMob, BannerAdSize, BannerAdPosition } = await import("@capacitor-community/admob");
       await AdMob.showBanner({
-        adId: AD_UNIT_IDS.banner,
+        adId: ads.banner_unit_id,
         adSize: BannerAdSize.ADAPTIVE_BANNER,
-        position: BannerAdPosition.BOTTOM_CENTER,
+        position: ads.banner_position === "top" ? BannerAdPosition.TOP_CENTER : BannerAdPosition.BOTTOM_CENTER,
         margin: 0,
+        isTesting: ads.test_mode,
       });
     } catch (err) {
       console.warn("Banner ad failed:", err);
     }
-  }, [isPro]);
+  }, [adsOn, ads]);
 
   const hideBanner = useCallback(async () => {
     try {
       const { AdMob } = await import("@capacitor-community/admob");
       await AdMob.hideBanner();
-    } catch (err) {
-      // Silently fail in browser
-    }
+    } catch { /* browser */ }
   }, []);
 
   const showInterstitial = useCallback(async () => {
-    if (isPro) return;
+    if (!adsOn || !ads.interstitial_enabled) return;
+    viewCount++;
+    if (viewCount % Math.max(1, ads.interstitial_every_n_views) !== 0) return;
     try {
       const { AdMob } = await import("@capacitor-community/admob");
-      await AdMob.prepareInterstitial({ adId: AD_UNIT_IDS.interstitial });
+      await AdMob.prepareInterstitial({ adId: ads.interstitial_unit_id, isTesting: ads.test_mode });
       await AdMob.showInterstitial();
     } catch (err) {
       console.warn("Interstitial ad failed:", err);
     }
-  }, [isPro]);
+  }, [adsOn, ads]);
 
-  useEffect(() => {
-    if (!loading) {
-      initAdMob();
-    }
-  }, [loading, initAdMob]);
+  useEffect(() => { if (!loading) initAdMob(); }, [loading, initAdMob]);
 
-  return { showBanner, hideBanner, showInterstitial, isPro, loading };
+  return { showBanner, hideBanner, showInterstitial, isPro, loading, adsOn, ads };
 }
