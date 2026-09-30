@@ -650,6 +650,48 @@ export type Database = {
         }
         Relationships: []
       }
+      sponsor_videos: {
+        Row: {
+          click_url: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          placement: string
+          resolution: string
+          sort_order: number
+          sponsor_name: string
+          storage_path: string
+          title: string
+        }
+        Insert: {
+          click_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          placement?: string
+          resolution?: string
+          sort_order?: number
+          sponsor_name?: string
+          storage_path: string
+          title: string
+        }
+        Update: {
+          click_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          placement?: string
+          resolution?: string
+          sort_order?: number
+          sponsor_name?: string
+          storage_path?: string
+          title?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null
