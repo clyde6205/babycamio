@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { RTL_LANGUAGES } from "@/i18n";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import AppGate from "@/components/AppGate";
 
 // Lazy-load all pages for smaller initial bundle on low-end devices
 const Landing = lazy(() => import("./pages/Landing"));
@@ -79,6 +80,7 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <Suspense fallback={<PageLoader />}>
+            <AppGate>
             <Routes>
               <Route path="/" element={<SafePage scope="Landing"><Landing /></SafePage>} />
               <Route path="/login" element={<SafePage scope="Auth"><Auth mode="login" /></SafePage>} />
@@ -107,6 +109,7 @@ const App = () => {
               <Route path="/external-cameras" element={<SafePage scope="ExternalCameras"><ExternalCameras /></SafePage>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </AppGate>
           </Suspense>
         </BrowserRouter>
       </TooltipProvider>

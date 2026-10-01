@@ -14,6 +14,8 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import MultiCameraGrid from "@/components/MultiCameraGrid";
 import OnboardingWizard from "@/components/OnboardingWizard";
 import CopyrightFooter from "@/components/CopyrightFooter";
+import AdBanner from "@/components/AdBanner";
+import SponsorVideoPlayer from "@/components/SponsorVideoPlayer";
 
 interface Room {
   id: string;
@@ -146,8 +148,8 @@ const Dashboard = () => {
             </Button>
           )}
           {isAdmin && (
-            <Button variant="ghost" size="icon" onClick={() => navigate("/admin")} className="touch-target" title="Founder's Console">
-              <Shield className="h-4 w-4" />
+            <Button size="sm" onClick={() => navigate("/admin")} className="touch-target bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-bold shadow-lg shadow-orange-500/30 hover:opacity-90" title="Founder's Console">
+              <Shield className="h-4 w-4 mr-1" /> Admin
             </Button>
           )}
           <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="touch-target" title={t("settings.title")}>
@@ -363,8 +365,10 @@ const Dashboard = () => {
             </Button>
           </div>
         )}
+        <SponsorVideoPlayer placement="dashboard" className="mt-6" />
       </main>
 
+      <AdBanner />
       <CopyrightFooter variant="dark" showLinks={false} />
     </div>
   );

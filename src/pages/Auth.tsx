@@ -35,6 +35,8 @@ const Auth = ({ mode }: AuthProps) => {
       }
 
       if (mode === "signup") {
+        const { data: cfg } = await supabase.from("app_settings").select("setting_value").eq("setting_key", "app_config").maybeSingle();
+        if ((cfg?.setting_value as any)?.signups_enabled === false) throw new Error("New sign-ups are paused right now. Please try again later.");
         const { error, data } = await supabase.auth.signUp({
           email,
           password,
