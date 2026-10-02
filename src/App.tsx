@@ -35,6 +35,7 @@ const InstallApp = lazy(() => import("./pages/InstallApp"));
 const Diagnostics = lazy(() => import("./pages/Diagnostics"));
 const ExternalCameras = lazy(() => import("./pages/ExternalCameras"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Invite = lazy(() => import("./pages/Invite"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -103,6 +104,7 @@ const App = () => {
               <Route path="/milestones" element={<SafePage scope="Milestones"><Milestones /></SafePage>} />
               <Route path="/caregiver" element={<SafePage scope="Caregiver"><CaregiverMode /></SafePage>} />
               <Route path="/install" element={<SafePage scope="Install"><InstallApp /></SafePage>} />
+              <Route path="/invite/:code" element={<SafePage scope="Invite"><Invite /></SafePage>} />
               <Route path="/camera/:roomName" element={<SafePage scope="Camera"><CameraView /></SafePage>} />
               <Route path="/viewer/:roomName" element={<SafePage scope="Viewer"><ViewerView /></SafePage>} />
               <Route path="/diagnostics" element={<SafePage scope="Diagnostics"><Diagnostics /></SafePage>} />

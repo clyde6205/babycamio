@@ -47,16 +47,18 @@ const ReferralPage = () => {
   };
 
   const shareCode = async () => {
+    const link = `https://babycam.io/invite/${referralCode}`;
     if (navigator.share) {
       try {
         await navigator.share({
           title: "BabyCam.io - Free Baby Monitor",
-          text: `Try BabyCam.io - the best baby monitoring app! Use my referral code: ${referralCode} and we both get 1 month Pro free!`,
-          url: window.location.origin,
+          text: `Try BabyCam.io — turn any phone into a baby monitor. Sign up with my invite and we both get 1 month Pro free!`,
+          url: link,
         });
       } catch {}
     } else {
-      copyCode();
+      navigator.clipboard.writeText(link);
+      toast({ title: "Invite link copied!" });
     }
   };
 
@@ -78,7 +80,7 @@ const ReferralPage = () => {
             <Gift className="h-16 w-16 mx-auto text-yellow-400 mb-4" />
             <h2 className="text-xl font-bold mb-2">Invite Parents, Earn Pro!</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Share your referral code. When a parent signs up and uses BabyCam for 7 days, you BOTH get 1 month of Pro free!
+              Share your invite link. When a parent signs up with it, you BOTH get 1 month of Pro free — instantly!
             </p>
             <div className="rounded-xl bg-background border-2 border-dashed border-primary/30 p-4 mb-4">
               <p className="text-xs text-muted-foreground mb-1">Your Referral Code</p>
@@ -119,10 +121,9 @@ const ReferralPage = () => {
             <h3 className="font-semibold mb-3">How It Works</h3>
             <div className="space-y-3">
               {[
-                { step: "1", title: "Share your code", desc: "Send your referral code to other parents" },
-                { step: "2", title: "They sign up", desc: "They create an account using your code" },
-                { step: "3", title: "7-day trial", desc: "They use BabyCam for at least 7 days" },
-                { step: "4", title: "Both earn Pro!", desc: "You both get 1 month of Pro for free 🎉" },
+                { step: "1", title: "Share your link", desc: "Send your invite link on Facebook, WhatsApp or SMS" },
+                { step: "2", title: "They sign up", desc: "They create an account from your link" },
+                { step: "3", title: "Both earn Pro!", desc: "You both get 1 month of Pro instantly 🎉" },
               ].map((item) => (
                 <div key={item.step} className="flex items-start gap-3">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
