@@ -197,6 +197,12 @@ export const SponsorVideosPanel = () => {
           ))}
         </div>
         {progress !== null && <Progress value={progress} />}
+        {progress !== null && (
+          <div className="space-y-1">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} /></div>
+            <p className="text-xs text-muted-foreground text-right">{progress}% uploaded</p>
+          </div>
+        )}
         <Button onClick={upload} disabled={progress !== null} className="w-full touch-target">
           {progress !== null ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Upload & Publish
         </Button>
