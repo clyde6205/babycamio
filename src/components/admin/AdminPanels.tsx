@@ -122,14 +122,39 @@ export const SponsorVideosPanel = () => {
 
   const upload = async () => {
     if (!file || !form.title) { toast({ title: "Add a title and choose a video", variant: "destructive" }); return; }
-    setProgress(10);
+    if (file.size > 5 * 1024 ** 3) { toast({ title: "Video too large (max 5 GB)", variant: "destructive" }); return; }
+    setProgress(0);
     const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    // Auto-detect real resolution from the file
+    const detected = await new Promise<string>((resolve) => {
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.onloadedmetadata = () => {
+        const h = Math.min(v.videoWidth, v.videoHeight) || 0;
+        URL.revokeObjectURL(v.src);
+        resolve(h >= 2000 ? "4k" : h >= 1400 ? "1440p" : h >= 1000 ? "1080p" : h >= 700 ? "720p" : "auto");
+      };
+      v.onerror = () => resolve(form.resolution || "auto");
+      v.src = URL.createObjectURL(file);
+    });
     const ext = file.name.split(".").pop() || "mp4";
     const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const tick = setInterval(() => setProgress((p) => (p !== null && p < 90 ? p + 2 : p)), 800);
-    const { error } = await supabase.storage.from("sponsor-videos").upload(path, file, { contentType: file.type || "video/mp4", upsert: false });
-    clearInterval(tick);
-    if (error) { setProgress(null); toast({ title: "Upload failed", description: error.message, variant: "destructive" }); return; }
+    // Direct upload with real byte progress
+    const error = await new Promise<string | null>((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/sponsor-videos/${path}`);
+      xhr.setRequestHeader("Authorization", `Bearer ${session?.access_token}`);
+      xhr.setRequestHeader("apikey", import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+      xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
+      xhr.setRequestHeader("x-upsert", "false");
+      xhr.upload.onprogress = (e) => e.lengthComputable && setProgress(Math.round((e.loaded / e.total) * 100));
+      xhr.onload = () => resolve(xhr.status < 300 ? null : xhr.responseText || `HTTP ${xhr.status}`);
+      xhr.onerror = () => resolve("Network error — check your connection and try again");
+      xhr.send(file);
+    });
+    if (error) { setProgress(null); toast({ title: "Upload failed", description: error, variant: "destructive" }); return; }
+    form.resolution = form.resolution === "auto" || !form.resolution ? detected : form.resolution;
     const { error: e2 } = await supabase.from("sponsor_videos" as any).insert({ ...form, click_url: form.click_url || null, storage_path: path, created_by: user?.id });
     setProgress(null);
     if (e2) { toast({ title: "Save failed", description: e2.message, variant: "destructive" }); return; }
@@ -172,6 +197,12 @@ export const SponsorVideosPanel = () => {
           ))}
         </div>
         {progress !== null && <Progress value={progress} />}
+        {progress !== null && (
+          <div className="space-y-1">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} /></div>
+            <p className="text-xs text-muted-foreground text-right">{progress}% uploaded</p>
+          </div>
+        )}
         <Button onClick={upload} disabled={progress !== null} className="w-full touch-target">
           {progress !== null ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Upload & Publish
         </Button>

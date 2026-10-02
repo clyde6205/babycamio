@@ -232,6 +232,31 @@ const Pricing = () => {
           </div>
         </Card>
 
+        {/* Business / Daycare plan */}
+        <Card id="business" className="mt-6 border-primary/40 bg-white/5 p-6 text-primary-foreground backdrop-blur-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                Business & Daycare
+                <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase">Teams</span>
+              </h3>
+              <p className="text-sm text-primary-foreground/50 mt-0.5">For daycares, nurseries, nannies and care homes</p>
+              <ul className="mt-2 space-y-1">
+                {["Up to 50 cameras across rooms", "Staff accounts with caregiver access", "Secure viewing links for each parent", "Recordings, motion and cry alerts for every room", "Priority support and onboarding"].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-xs text-primary-foreground/60"><Check className="h-3 w-3 text-primary" /> {f}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="text-center sm:text-right shrink-0">
+              <div className="mb-2"><span className="text-3xl font-extrabold">Custom</span></div>
+              <Button asChild className="w-full sm:w-auto touch-target px-6">
+                <a href="mailto:admin@babycam.io?subject=BabyCam.io%20Business%20%26%20Daycare%20plan">Contact sales</a>
+              </Button>
+              <p className="text-[10px] text-primary-foreground/40 mt-1">Volume pricing per camera</p>
+            </div>
+          </div>
+        </Card>
+
         <div className="mt-12 grid grid-cols-3 gap-4 text-center">
           {[
             { icon: Shield, label: t("pricing.bankGrade") },

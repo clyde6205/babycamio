@@ -16,6 +16,12 @@ const AppGate = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
+      // Share-to-earn: claim a pending invite code once after sign-up
+      const ref = localStorage.getItem("babycam_ref");
+      if (ref) {
+        localStorage.removeItem("babycam_ref");
+        supabase.functions.invoke("claim-referral", { body: { code: ref } }).catch(() => {});
+      }
       const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin");
       setIsAdmin(!!data?.length);
     });
