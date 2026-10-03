@@ -34,6 +34,7 @@ const Dashboard = () => {
   const { user, loading: authLoading } = useAutoAuth();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+  const [shareRoom, setShareRoom] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -251,7 +252,7 @@ const Dashboard = () => {
                   {/* BIG SHARE BUTTON — the most important action */}
                   <Button
                     size="lg"
-                    className="w-full touch-target bg-green-600 hover:bg-green-700 text-white font-bold text-base"
+                    className="w-full touch-target bg-success hover:bg-success/90 text-success-foreground font-bold text-base"
                     onClick={() => setShareRoom(room.room_name)}
                   >
                     <Share2 className="mr-2 h-5 w-5" /> Share Camera — QR & WhatsApp
@@ -362,6 +363,10 @@ const Dashboard = () => {
       </main>
 
       <AdBanner />
+      {shareRoom && (
+        <ShareSheet open={!!shareRoom} onOpenChange={(o) => !o && setShareRoom(null)} url={viewerLink(shareRoom)}
+          title={shareRoom.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")} />
+      )}
       <CopyrightFooter variant="dark" showLinks={false} />
     </div>
   );

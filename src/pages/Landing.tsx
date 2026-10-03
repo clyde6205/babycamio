@@ -10,7 +10,7 @@ import CopyrightFooter from "@/components/CopyrightFooter";
 import { AnimateOnScroll } from "@/hooks/use-scroll-animate";
 import AnimatedCounter from "@/components/AnimatedCounter";
 
-const APP_URL = "https://babycamio.lovable.app"; // install link
+const APP_URL = "https://babycam.io"; // install link
 
 const TESTIMONIALS = [
   { name: "Sarah M.", country: "🇺🇸 USA", stars: 5, text: "Finally a baby monitor that works on our terrible rural Wi-Fi. Audio fallback is a lifesaver at 2AM." },

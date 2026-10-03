@@ -11,7 +11,7 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-const APP_URL = "https://babycamio.lovable.app";
+const APP_URL = "https://babycam.io";
 
 const InstallApp = () => {
   const navigate = useNavigate();
