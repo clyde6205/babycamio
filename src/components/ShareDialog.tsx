@@ -76,6 +76,12 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
 
       if (error) throw error;
 
+      const to = email.trim().toLowerCase();
+      const link = `https://babycam.io/viewer/${roomName}`;
+      // Actually deliver the invite: open the sender's email app with everything filled in
+      const a = document.createElement("a");
+      a.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(`Watch "${friendlyName}" live on BabyCam.io`)}&body=${encodeURIComponent(`Hi!\n\nYou've been invited to watch my baby camera "${friendlyName}" live.\n\nTap this link (no download or account needed):\n${link}\n\nYour access code: ${code}\n\nSent with BabyCam.io`)}`;
+      document.body.appendChild(a); a.click(); a.remove();
       setEmail("");
       await loadSharedUsers();
       toast({
@@ -206,7 +212,7 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
 
           {/* Share via SMS — Worldwide via Twilio + Local fallback */}
           <SmsSender
-            defaultMessage={`Watch my baby camera "${friendlyName}" live now: https://babycamio.lovable.app/viewer/${roomName}`}
+            defaultMessage={`Watch my baby camera "${friendlyName}" live now: https://babycam.io/viewer/${roomName}`}
           />
 
           {/* Native Share */}
@@ -218,7 +224,7 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
                 navigator.share({
                   title: `BabyCam - ${friendlyName}`,
                   text: `Watch my baby camera "${friendlyName}" live! Tap this link on your Android phone:`,
-                  url: `https://babycamio.lovable.app/viewer/${roomName}`,
+                  url: `https://babycam.io/viewer/${roomName}`,
                 }).catch(() => {});
               }}
             >

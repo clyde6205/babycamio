@@ -10,6 +10,8 @@ import { useSubscription } from "@/hooks/use-subscription";
 import { useToast } from "@/hooks/use-toast";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import ShareDialog from "@/components/ShareDialog";
+import ShareSheet from "@/components/ShareSheet";
+import { viewerLink } from "@/lib/share";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import MultiCameraGrid from "@/components/MultiCameraGrid";
 import OnboardingWizard from "@/components/OnboardingWizard";
@@ -32,6 +34,7 @@ const Dashboard = () => {
   const { user, loading: authLoading } = useAutoAuth();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+  const [shareRoom, setShareRoom] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -110,8 +113,7 @@ const Dashboard = () => {
   };
 
   const copyRoomCode = (roomName: string) => {
-    const appBase = "https://babycamio.lovable.app";
-    const viewerUrl = `${appBase}/viewer/${roomName}`;
+    const viewerUrl = viewerLink(roomName);
     navigator.clipboard.writeText(viewerUrl);
     setCopiedId(roomName);
     setTimeout(() => setCopiedId(null), 2000);
@@ -250,18 +252,10 @@ const Dashboard = () => {
                   {/* BIG SHARE BUTTON — the most important action */}
                   <Button
                     size="lg"
-                    className="w-full touch-target bg-green-600 hover:bg-green-700 text-white font-bold text-base"
-                    onClick={() => {
-                      const link = `https://babycamio.lovable.app/viewer/${room.room_name}`;
-                      if (navigator.share) {
-                        navigator.share({ title: "BabyCam", text: "Watch my baby camera live! Tap this link on your Android phone:", url: link }).catch(() => {});
-                      } else {
-                        navigator.clipboard.writeText(link);
-                        toast({ title: "Link copied!", description: link });
-                      }
-                    }}
+                    className="w-full touch-target bg-success hover:bg-success/90 text-success-foreground font-bold text-base"
+                    onClick={() => setShareRoom(room.room_name)}
                   >
-                    <Share2 className="mr-2 h-5 w-5" /> Share Camera Link
+                    <Share2 className="mr-2 h-5 w-5" /> Share Camera — QR & WhatsApp
                   </Button>
                   <div className="flex gap-2">
                     <Button size="sm" className="flex-1 touch-target" onClick={() => navigate(`/camera/${room.room_name}`)}>
@@ -369,6 +363,10 @@ const Dashboard = () => {
       </main>
 
       <AdBanner />
+      {shareRoom && (
+        <ShareSheet open={!!shareRoom} onOpenChange={(o) => !o && setShareRoom(null)} url={viewerLink(shareRoom)}
+          title={shareRoom.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")} />
+      )}
       <CopyrightFooter variant="dark" showLinks={false} />
     </div>
   );

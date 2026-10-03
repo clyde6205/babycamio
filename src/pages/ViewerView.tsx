@@ -8,7 +8,7 @@ import {
   SignalHigh, SignalMedium, SignalLow, WifiOff, Activity, Baby, Heart, BatteryWarning, WifiOff as WifiOffIcon2,
   Share2, Copy, Check, QrCode, X, MessageCircle, Mail, Send, Circle,
 } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import ShareSheet from "@/components/ShareSheet";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
 import { ConnectionState, RoomEvent, Track } from "livekit-client";
 import TalkbackButton from "@/components/TalkbackButton";
@@ -279,50 +279,7 @@ const ViewerView = () => {
 
   return (
     <div ref={containerRef} className="flex min-h-[100dvh] flex-col bg-black text-white select-none">
-      {/* QR Share Overlay */}
-      {showShareQR && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/90 backdrop-blur-sm" onClick={() => setShowShareQR(false)}>
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md text-center animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setShowShareQR(false)} className="absolute top-4 right-4 text-gray-400"><X className="h-6 w-6" /></button>
-            <h2 className="text-xl font-bold text-gray-900 mb-1">📱 Share This Camera</h2>
-            <p className="text-sm text-gray-500 mb-4">Send this link — receiver taps → instant live view</p>
-            <div className="grid grid-cols-5 gap-2 mb-5">
-              <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Watch my baby camera live!\n${viewerUrl}`)}`, "_blank")} className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors">
-                <div className="h-12 w-12 rounded-full bg-green-500 flex items-center justify-center"><MessageCircle className="h-6 w-6 text-white" /></div>
-                <span className="text-[11px] font-medium text-gray-700">WhatsApp</span>
-              </button>
-              <button onClick={() => window.open(`fb-messenger://share/?link=${encodeURIComponent(viewerUrl)}`, "_self")} className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors">
-                <div className="h-12 w-12 rounded-full bg-[#0084FF] flex items-center justify-center"><MessageCircle className="h-6 w-6 text-white" /></div>
-                <span className="text-[11px] font-medium text-gray-700">Messenger</span>
-              </button>
-              <button onClick={() => window.open(`sms:?body=${encodeURIComponent(`Watch my baby camera live! ${viewerUrl}`)}`, "_self")} className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors">
-                <div className="h-12 w-12 rounded-full bg-blue-500 flex items-center justify-center"><MessageCircle className="h-6 w-6 text-white" /></div>
-                <span className="text-[11px] font-medium text-gray-700">SMS</span>
-              </button>
-              <button onClick={() => window.open(`https://t.me/share/url?url=${encodeURIComponent(viewerUrl)}&text=${encodeURIComponent("Watch my baby camera live!")}`, "_blank")} className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors">
-                <div className="h-12 w-12 rounded-full bg-sky-500 flex items-center justify-center"><Send className="h-6 w-6 text-white" /></div>
-                <span className="text-[11px] font-medium text-gray-700">Telegram</span>
-              </button>
-              <button onClick={() => window.open(`mailto:?subject=${encodeURIComponent("Watch my baby camera live!")}&body=${encodeURIComponent(`Tap this link to watch:\n\n${viewerUrl}`)}`, "_self")} className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors">
-                <div className="h-12 w-12 rounded-full bg-orange-500 flex items-center justify-center"><Mail className="h-6 w-6 text-white" /></div>
-                <span className="text-[11px] font-medium text-gray-700">Email</span>
-              </button>
-            </div>
-            <Button onClick={nativeShare} className="w-full mb-4 h-12 text-base font-semibold" size="lg">
-              <Share2 className="h-5 w-5 mr-2" /> More Apps...
-            </Button>
-            <div className="border-t pt-4">
-              <p className="text-xs text-gray-400 mb-3 uppercase tracking-wider font-semibold">Or scan QR code</p>
-              <div className="flex justify-center mb-3"><QRCodeSVG value={viewerUrl} size={160} level="H" includeMargin /></div>
-            </div>
-            <Button onClick={copyViewerLink} variant="outline" className="w-full mt-3 text-gray-900 h-11">
-              {linkCopied ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <Copy className="h-4 w-4 mr-2" />}
-              {linkCopied ? "Copied!" : "Copy Link"}
-            </Button>
-            <p className="text-[10px] text-gray-400 mt-3 break-all">{viewerUrl}</p>
-          </div>
-        </div>
-      )}
+      <ShareSheet open={showShareQR} onOpenChange={setShowShareQR} url={viewerUrl} title={friendlyName} />
       {motionAlert && (
         <div className="fixed inset-0 z-50 pointer-events-none flex items-start justify-center pt-20">
           <div className="pointer-events-auto animate-bounce rounded-2xl bg-orange-500/95 px-6 py-4 shadow-2xl shadow-orange-500/40 flex items-center gap-3">
