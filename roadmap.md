@@ -5,3 +5,6 @@
 - [x] Wire ads settings into app (AdBanner placement)
 - [x] Share-to-earn (instant Pro both sides), public invite page, Business/Daycare plan, SEO fixes, sponsor upload progress
 - [ ] Real AdMob ad IDs — needs founder's AdMob account
+- [x] Real sharing hub: QR first, QR picture to WhatsApp, WhatsApp/Messenger/Facebook/SMS/Telegram/email, all links on babycam.io
+- [ ] Branded sign-up/invite emails from babycam.io — needs founder to set up email domain (DNS)
+- [ ] Hide "Edit with Lovable" badge — needs Pro plan

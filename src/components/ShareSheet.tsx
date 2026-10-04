@@ -69,7 +69,7 @@ const ShareSheet = ({ open, onOpenChange, url, title, message }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><QrCode className="h-5 w-5 text-primary" /> Share “{title}”</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 capitalize"><QrCode className="h-5 w-5 text-primary" /> Share “{title}”</DialogTitle>
           <DialogDescription>Receivers scan or tap — the live view opens instantly in their browser. No app or account needed.</DialogDescription>
         </DialogHeader>
 
@@ -80,7 +80,7 @@ const ShareSheet = ({ open, onOpenChange, url, title, message }: Props) => {
           </div>
           <div className="grid w-full grid-cols-2 gap-2">
             <Button onClick={sendQr} className="h-11 bg-success text-success-foreground hover:bg-success/90">
-              <MessageCircle className="mr-2 h-4 w-4" /> Send QR on WhatsApp
+              <MessageCircle className="mr-2 h-4 w-4" /> QR to WhatsApp
             </Button>
             <Button variant="outline" onClick={saveQr} className="h-11"><Download className="mr-2 h-4 w-4" /> Save QR</Button>
           </div>
@@ -89,7 +89,7 @@ const ShareSheet = ({ open, onOpenChange, url, title, message }: Props) => {
 
         {/* 2. Apps */}
         <div className="space-y-2">
-          <Input inputMode="tel" placeholder="WhatsApp / SMS number (optional, e.g. +63 912 345 6789)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Input inputMode="tel" placeholder="Phone number (optional) e.g. +63 912…" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <div className="grid grid-cols-5 gap-2">
             {apps.map(({ label, icon: Icon, tone, go }) => (
               <button key={label} onClick={go} className="flex flex-col items-center gap-1.5 rounded-xl p-2 hover:bg-muted active:bg-muted">
