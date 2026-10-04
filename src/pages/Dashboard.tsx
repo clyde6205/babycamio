@@ -311,6 +311,10 @@ const Dashboard = () => {
             <Bot className="h-6 w-6 text-primary" />
             <span className="text-xs font-medium text-center">{t("dashboard.aiAssistant")}</span>
           </Card>
+          <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/troubleshoot")}>
+            <Activity className="h-6 w-6 text-destructive" />
+            <span className="text-xs font-medium text-center">Fix viewer error</span>
+          </Card>
           <Card className="p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate("/tools/measure")}>
             <Ruler className="h-6 w-6 text-primary" />
             <span className="text-xs font-medium text-center">{t("dashboard.measure")}</span>

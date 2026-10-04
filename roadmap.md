@@ -8,3 +8,6 @@
 - [x] Real sharing hub: QR first, QR picture to WhatsApp, WhatsApp/Messenger/Facebook/SMS/Telegram/email, all links on babycam.io
 - [ ] Branded sign-up/invite emails from babycam.io — needs founder to set up email domain (DNS)
 - [ ] Hide "Edit with Lovable" badge — needs Pro plan
+
+- [x] AI viewer error troubleshooter (/troubleshoot)
+- [ ] Server-sent camera invitations by email: expiring secure links, delivery status, resend (needs babycam.io email domain)
