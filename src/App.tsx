@@ -36,6 +36,7 @@ const Diagnostics = lazy(() => import("./pages/Diagnostics"));
 const ExternalCameras = lazy(() => import("./pages/ExternalCameras"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Invite = lazy(() => import("./pages/Invite"));
+const Troubleshoot = lazy(() => import("./pages/Troubleshoot"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,6 +96,7 @@ const App = () => {
               <Route path="/disclaimer" element={<SafePage scope="Disclaimer"><Disclaimer /></SafePage>} />
               <Route path="/tools/measure" element={<SafePage scope="Measure"><MeasureTool /></SafePage>} />
               <Route path="/tools/level" element={<SafePage scope="Level"><LevelTool /></SafePage>} />
+              <Route path="/troubleshoot" element={<SafePage scope="Troubleshoot"><Troubleshoot /></SafePage>} />
               <Route path="/ai" element={<SafePage scope="AI"><AIAssistant /></SafePage>} />
               <Route path="/recordings" element={<SafePage scope="Recordings"><Recordings /></SafePage>} />
               <Route path="/sleep" element={<SafePage scope="Sleep"><SleepAnalytics /></SafePage>} />
