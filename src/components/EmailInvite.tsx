@@ -22,8 +22,9 @@ const STATUS_LABEL: Record<Invitation["status"], string> = {
 };
 
 /** Server-sent email invitations with delivery status and resend. Lives inside the share panel. */
-const EmailInvite = ({ roomId }: { roomId: string }) => {
+const EmailInvite = ({ roomName }: { roomName: string }) => {
   const { toast } = useToast();
+  const [roomId, setRoomId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
