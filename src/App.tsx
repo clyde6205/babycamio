@@ -37,6 +37,7 @@ const ExternalCameras = lazy(() => import("./pages/ExternalCameras"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Invite = lazy(() => import("./pages/Invite"));
 const Troubleshoot = lazy(() => import("./pages/Troubleshoot"));
+const InviteCamera = lazy(() => import("./pages/InviteCamera"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
