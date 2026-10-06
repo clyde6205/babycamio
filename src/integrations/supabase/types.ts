@@ -149,6 +149,53 @@ export type Database = {
         }
         Relationships: []
       }
+      camera_invitations: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          opened_at: string | null
+          owner_id: string
+          room_id: string
+          sent_at: string | null
+          status: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          opened_at?: string | null
+          owner_id: string
+          room_id: string
+          sent_at?: string | null
+          status?: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          opened_at?: string | null
+          owner_id?: string
+          room_id?: string
+          sent_at?: string | null
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camera_invitations_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       caregiver_access: {
         Row: {
           access_level: string
@@ -796,6 +843,15 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      validate_invitation: {
+        Args: { _token: string }
+        Returns: {
+          expired: boolean
+          opened_at: string
+          room_name: string
+          room_type: string
+        }[]
       }
     }
     Enums: {
