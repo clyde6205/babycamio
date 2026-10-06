@@ -60,7 +60,7 @@ const EmailInvite = ({ roomName }: { roomName: string }) => {
 
   const send = async (resend = false, existingEmail?: string, id?: string) => {
     const target = (existingEmail ?? email).trim();
-    if (!target) return;
+    if (!target || !roomId) return;
     if (id) setResendingId(id); else setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-invitation", {
