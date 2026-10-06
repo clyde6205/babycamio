@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Copy, Download, Mail, MessageCircle, MessageSquare, QrCode, Send, Share2, Facebook } from "lucide-react";
+import EmailInvite from "@/components/EmailInvite";
 import {
   brandedQrBlob, copyText, downloadBlob, facebookUrl, mailUrl, messengerUrl, openExternal,
   shareImage, shareLink, smsUrl, telegramUrl, whatsappUrl,
@@ -18,10 +19,12 @@ interface Props {
   title: string;
   /** Message sent with the link */
   message?: string;
+  /** Camera room name — when set (owner side), shows the server-sent email invitation block */
+  roomName?: string;
 }
 
 /** One sharing hub used everywhere: QR first, then WhatsApp, Messenger, SMS, email, Telegram, copy. */
-const ShareSheet = ({ open, onOpenChange, url, title, message }: Props) => {
+const ShareSheet = ({ open, onOpenChange, url, title, message, roomName }: Props) => {
   const { toast } = useToast();
   const qrWrap = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
