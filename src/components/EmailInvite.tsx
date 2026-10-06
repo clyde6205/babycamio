@@ -30,7 +30,23 @@ const EmailInvite = ({ roomName }: { roomName: string }) => {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [invites, setInvites] = useState<Invitation[]>([]);
 
+  // Resolve the room id from the room name (share panel only knows the name)
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("rooms")
+        .select("id")
+        .eq("room_name", roomName)
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (data) setRoomId(data.id);
+    })();
+  }, [roomName]);
+
   const load = useCallback(async () => {
+    if (!roomId) return;
     const { data } = await supabase
       .from("camera_invitations")
       .select("id, email, status, expires_at, created_at")
@@ -44,7 +60,7 @@ const EmailInvite = ({ roomName }: { roomName: string }) => {
 
   const send = async (resend = false, existingEmail?: string, id?: string) => {
     const target = (existingEmail ?? email).trim();
-    if (!target) return;
+    if (!target || !roomId) return;
     if (id) setResendingId(id); else setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-invitation", {

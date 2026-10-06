@@ -10,5 +10,5 @@
 - [ ] Hide "Edit with Lovable" badge — needs Pro plan
 
 - [x] AI viewer error troubleshooter (/troubleshoot)
-- [ ] Server-sent camera invitations by email: expiring secure links, delivery status, resend (needs babycam.io email domain)
+- [x] Server-sent camera invitations: expiring secure links (7 days), delivery status, resend, invite landing page — sending activates once babycam.io email domain is verified
 - [x] QR sharing verified end-to-end (panel, branded QR image, WhatsApp/apps/email) — needs publish + APK rebuild to reach users

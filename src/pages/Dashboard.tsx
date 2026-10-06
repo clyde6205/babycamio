@@ -369,7 +369,7 @@ const Dashboard = () => {
       <AdBanner />
       {shareRoom && (
         <ShareSheet open={!!shareRoom} onOpenChange={(o) => !o && setShareRoom(null)} url={viewerLink(shareRoom)}
-          title={shareRoom.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")} />
+          title={shareRoom.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")} roomName={shareRoom} />
       )}
       <CopyrightFooter variant="dark" showLinks={false} />
     </div>
