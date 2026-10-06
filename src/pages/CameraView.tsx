@@ -415,7 +415,7 @@ const CameraView = () => {
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-black text-white select-none">
-      <ShareSheet open={showShareQR} onOpenChange={setShowShareQR} url={viewerUrl} title={friendlyName} />
+      <ShareSheet open={showShareQR} onOpenChange={setShowShareQR} url={viewerUrl} title={friendlyName} roomName={roomName} />
       <header className="relative z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
         <button onClick={handleDisconnect} className="touch-target flex items-center gap-2"><ArrowLeft className="h-5 w-5" /></button>
         <div className="flex items-center gap-3">

@@ -103,7 +103,10 @@ const ShareSheet = ({ open, onOpenChange, url, title, message, roomName }: Props
           </div>
         </div>
 
-        {/* 3. Email */}
+        {/* 3. Server-sent email invitation (owner side) */}
+        {roomName && <EmailInvite roomName={roomName} />}
+
+        {/* 4. Email via own mail app */}
         <div className="flex gap-2">
           <Input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} />
           <Button
