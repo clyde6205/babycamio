@@ -40,10 +40,8 @@ async function verifyStripeSignature(rawBody: string, header: string | null, sec
   if (!header) return false;
   const parsed = parseStripeSignature(header);
   if (!parsed) return false;
-
   const timestampSeconds = Number(parsed.timestamp);
   if (!Number.isFinite(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > 5 * 60) return false;
-
   const expected = await hmacSha256Hex(secret, `${parsed.timestamp}.${rawBody}`);
   return parsed.signatures.some((signature) => secureCompare(expected, signature));
 }
@@ -62,14 +60,11 @@ async function verifyPayMongoSignature(rawBody: string, header: string | null, s
   if (!header) return false;
   const parsed = parsePayMongoSignature(header);
   if (!parsed) return false;
-
   const timestampSeconds = Number(parsed.timestamp);
   if (!Number.isFinite(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > 5 * 60) return false;
-
   const mode = Deno.env.get("PAYMONGO_WEBHOOK_MODE") || "live";
   const supplied = mode === "test" ? parsed.test : parsed.live;
   if (!supplied) return false;
-
   const expected = await hmacSha256Hex(secret, `${parsed.timestamp}.${rawBody}`);
   return secureCompare(expected, supplied);
 }
@@ -108,7 +103,6 @@ serve(async (req) => {
           const userId = session.metadata?.user_id;
           const plan = session.metadata?.plan === "pro" ? "pro" : "free";
           const billing = session.metadata?.billing === "annual" ? "annual" : "monthly";
-
           if (userId && plan === "pro") {
             const now = new Date();
             const periodEnd = new Date(now);
@@ -156,32 +150,37 @@ serve(async (req) => {
         if (!verified) return json({ error: "Invalid PayMongo webhook signature" }, 401);
 
         const event = JSON.parse(rawBody);
-        const data = event.data?.attributes;
-        const eventType = event.data?.attributes?.type || event.data?.type;
-        if ((eventType === "checkout_session.payment.paid" || data?.status === "paid") && data?.metadata?.user_id) {
-          const userId = data.metadata.user_id;
-          const billing = data.metadata?.billing === "annual" ? "annual" : "monthly";
+        const eventAttributes = event.data?.attributes || {};
+        const eventType = eventAttributes.type || event.data?.type;
+        const resource = eventAttributes.data || event.data || {};
+        const resourceAttributes = resource.attributes || resource;
+        const metadata = resourceAttributes.metadata || {};
+        const paid = eventType === "checkout_session.payment.paid" || eventType === "payment.paid" || resourceAttributes.status === "paid";
+
+        if (paid && metadata.user_id) {
+          const billing = metadata.billing === "annual" ? "annual" : "monthly";
           const now = new Date();
           const periodEnd = new Date(now);
           if (billing === "annual") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
           else periodEnd.setMonth(periodEnd.getMonth() + 1);
+          const providerPaymentId = String(resource.id || event.data.id);
 
           await supabase.from("subscriptions").update({
             plan: "pro",
             status: "active",
             payment_provider: "paymongo",
-            provider_subscription_id: event.data.id,
+            provider_subscription_id: providerPaymentId,
             current_period_start: now.toISOString(),
             current_period_end: periodEnd.toISOString(),
             cancel_at_period_end: false,
-          }).eq("user_id", userId);
+          }).eq("user_id", metadata.user_id);
 
           await supabase.from("payments").insert({
-            user_id: userId,
-            amount_cents: data.amount || data.line_items?.[0]?.amount || 0,
-            currency: (data.currency || "PHP").toUpperCase(),
+            user_id: metadata.user_id,
+            amount_cents: resourceAttributes.amount || resourceAttributes.line_items?.[0]?.amount || 0,
+            currency: (resourceAttributes.currency || "PHP").toUpperCase(),
             payment_provider: "paymongo",
-            provider_payment_id: event.data.id,
+            provider_payment_id: providerPaymentId,
             status: "succeeded",
             metadata: { paymongo_event_type: eventType, billing },
           });
@@ -189,11 +188,8 @@ serve(async (req) => {
         break;
       }
 
-      case "mpesa": {
-        // Safaricom callbacks do not have an HMAC header. This endpoint is disabled until
-        // a provider-specific shared secret/allow-list verification is configured.
+      case "mpesa":
         return json({ error: "M-Pesa webhook verification is not configured" }, 503);
-      }
 
       default:
         return json({ error: "Unsupported payment provider" }, 400);
