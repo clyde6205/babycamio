@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://esm.sh/zod@3";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://babycam.io",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
@@ -19,15 +19,26 @@ const json = (data: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+const escapeHtml = (value: string) =>
+  value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!supabaseUrl || !supabaseAnonKey) return json({ error: "Invitation service is not configured" }, 503);
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -42,7 +53,6 @@ Deno.serve(async (req) => {
     const { room_id, email, resend } = parsed.data;
     const cleanEmail = email.trim().toLowerCase();
 
-    // Verify the caller owns this room
     const { data: room, error: roomError } = await supabase
       .from("rooms")
       .select("id, room_name, owner_id")
@@ -52,7 +62,6 @@ Deno.serve(async (req) => {
       return json({ error: "Camera not found or not yours" }, 403);
     }
 
-    // Find an existing invitation for this room+email, or create one
     const { data: existing } = await supabase
       .from("camera_invitations")
       .select("id, token, status")
@@ -70,8 +79,7 @@ Deno.serve(async (req) => {
     }
 
     if (existing && resend) {
-      // Resend: fresh token + fresh 7-day expiry
-      const { data: updated, error: upErr } = await supabase
+      const { data: updated, error: updateError } = await supabase
         .from("camera_invitations")
         .update({
           token: crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "").slice(0, 16),
@@ -83,41 +91,38 @@ Deno.serve(async (req) => {
         .eq("id", existing.id)
         .select("id, token")
         .single();
-      if (upErr || !updated) return json({ error: "Could not resend the invitation" }, 500);
+      if (updateError || !updated) return json({ error: "Could not resend the invitation" }, 500);
       invitationId = updated.id;
       inviteToken = updated.token;
     } else {
-      const { data: created, error: insErr } = await supabase
+      const { data: created, error: insertError } = await supabase
         .from("camera_invitations")
         .insert({ room_id, owner_id: userId, email: cleanEmail })
         .select("id, token")
         .single();
-      if (insErr || !created) return json({ error: "Could not create the invitation" }, 500);
+      if (insertError || !created) return json({ error: "Could not create the invitation" }, 500);
       invitationId = created.id;
       inviteToken = created.token;
     }
 
     const inviteUrl = `https://babycam.io/invite-camera/${inviteToken}`;
-
-    // Send the email through the transactional email queue when configured.
-    // Until the babycam.io email domain is verified, invitations stay "queued"
-    // and can be resent once sending is live.
     const emailApiUrl = Deno.env.get("EMAIL_QUEUE_URL");
     const emailApiKey = Deno.env.get("EMAIL_QUEUE_KEY");
     let status = "queued";
 
     if (emailApiUrl && emailApiKey) {
       try {
-        const sendRes = await fetch(emailApiUrl, {
+        const safeRoomName = escapeHtml(room.room_name.replace(/-[a-z0-9]+$/i, "").replace(/-/g, " "));
+        const sendResponse = await fetch(emailApiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${emailApiKey}` },
           body: JSON.stringify({
             to: cleanEmail,
-            subject: `Watch "${room.room_name}" live on BabyCam.io`,
-            html: invitationEmail(room.room_name, inviteUrl),
+            subject: `Watch "${safeRoomName}" live on BabyCam.io`,
+            html: invitationEmail(safeRoomName, inviteUrl),
           }),
         });
-        status = sendRes.ok ? "sent" : "failed";
+        status = sendResponse.ok ? "sent" : "failed";
       } catch {
         status = "failed";
       }
@@ -129,8 +134,9 @@ Deno.serve(async (req) => {
     }
 
     return json({ id: invitationId, status, inviteUrl, emailConfigured: Boolean(emailApiUrl) });
-  } catch (e) {
-    return json({ error: e instanceof Error ? e.message : "Unexpected error" }, 500);
+  } catch (error) {
+    console.error("[SendInvitation] Error:", error);
+    return json({ error: "An error occurred processing your request" }, 500);
   }
 });
 
