@@ -8,82 +8,88 @@ const corsHeaders = {
 
 const PLAN_PRICES: Record<string, Record<string, number>> = {
   pro: {
-    monthly: 1097,  // $10.97 in cents
-    annual: 9900,   // $99.00 in cents
+    monthly: 1097,
+    annual: 9900,
   },
 };
 
-async function getProviderKeys(supabase: any, userId: string, provider: string): Promise<Record<string, string>> {
-  const { data } = await supabase
-    .from("provider_settings")
-    .select("key_name, key_value")
-    .eq("user_id", userId)
-    .eq("provider", provider);
+function normalizeOrigin(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
 
-  const keys: Record<string, string> = {};
-  (data || []).forEach((row: any) => {
-    keys[row.key_name] = row.key_value;
+function getCheckoutOrigin(req: Request): string {
+  const configuredOrigins = [
+    Deno.env.get("APP_BASE_URL"),
+    ...(Deno.env.get("ALLOWED_CHECKOUT_ORIGINS") || "").split(","),
+    "https://babycam.io",
+    "https://www.babycam.io",
+    "https://localhost",
+    "capacitor://localhost",
+    "http://localhost:5173",
+    "http://localhost:4173",
+    "http://localhost:8080",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8080",
+  ]
+    .map((origin) => normalizeOrigin(origin?.trim()))
+    .filter((origin): origin is string => Boolean(origin));
+
+  const requestedOrigin = normalizeOrigin(req.headers.get("origin"));
+  if (requestedOrigin && configuredOrigins.includes(requestedOrigin)) return requestedOrigin;
+
+  return normalizeOrigin(Deno.env.get("APP_BASE_URL")) || "https://babycam.io";
+}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-  return keys;
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !supabaseKey) return json({ error: "Checkout service is not configured" }, 503);
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (authError || !user) return json({ error: "Invalid token" }, 401);
 
     const { provider, plan, billing = "monthly" } = await req.json();
+    if (!provider || !plan || !PLAN_PRICES[plan]) return json({ error: "Invalid plan or provider" }, 400);
+    if (!["monthly", "annual"].includes(billing)) return json({ error: "Invalid billing interval" }, 400);
 
-    if (!provider || !plan || !PLAN_PRICES[plan]) {
-      return new Response(JSON.stringify({ error: "Invalid plan or provider" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const priceAmount = PLAN_PRICES[plan][billing] || PLAN_PRICES[plan].monthly;
+    const priceAmount = PLAN_PRICES[plan][billing];
     const interval = billing === "annual" ? "year" : "month";
     const priceLabel = billing === "annual" ? "$99.00/year" : "$10.97/month";
-
-    // Try env vars first, then fall back to DB-stored keys
-    const dbKeys = await getProviderKeys(supabase, user.id, provider);
+    const origin = getCheckoutOrigin(req);
 
     switch (provider) {
       case "stripe": {
-        const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || dbKeys.secret_key;
+        // Platform payment credentials must be server-configured. Do not use
+        // requester-provided provider_settings for platform subscriptions.
+        const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
         if (!stripeKey) {
-          return new Response(
-            JSON.stringify({
-              error: "Stripe not configured",
-              message: "Please add your Stripe API keys in Settings → Payment Providers.",
-            }),
-            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          return json({
+            error: "Stripe not configured",
+            message: "Stripe checkout is temporarily unavailable.",
+          }, 503);
         }
 
-        const origin = req.headers.get("origin") || "https://babycam.io";
         const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
           method: "POST",
           headers: {
@@ -91,8 +97,8 @@ serve(async (req) => {
             "Content-Type": "application/x-www-form-urlencoded",
           },
           body: new URLSearchParams({
-            "mode": "subscription",
-            "customer_email": user.email!,
+            mode: "subscription",
+            customer_email: user.email!,
             "metadata[user_id]": user.id,
             "metadata[plan]": plan,
             "metadata[billing]": billing,
@@ -100,98 +106,36 @@ serve(async (req) => {
             "line_items[0][price_data][unit_amount]": priceAmount.toString(),
             "line_items[0][price_data][recurring][interval]": interval,
             "line_items[0][price_data][product_data][name]": `BabyCam Pro (${billing === "annual" ? "Annual" : "Monthly"})`,
-            "line_items[0][price_data][product_data][description]": `Enterprise-grade 4K baby monitoring — ${priceLabel}`,
+            "line_items[0][price_data][product_data][description]": `Private baby monitoring — ${priceLabel}`,
             "line_items[0][quantity]": "1",
-            "success_url": `${origin}/dashboard?payment=success`,
-            "cancel_url": `${origin}/pricing?payment=canceled`,
+            success_url: `${origin}/dashboard?payment=success`,
+            cancel_url: `${origin}/pricing?payment=canceled`,
           }).toString(),
         });
 
         const session = await stripeRes.json();
-        if (session.error) {
-          throw new Error(session.error.message);
-        }
-
-        return new Response(
-          JSON.stringify({ url: session.url, provider: "stripe" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        if (session.error) throw new Error(session.error.message);
+        return json({ url: session.url, provider: "stripe" });
       }
 
       case "paypal": {
-        const paypalClientId = Deno.env.get("PAYPAL_CLIENT_ID") || dbKeys.client_id;
-        const paypalSecret = Deno.env.get("PAYPAL_SECRET") || dbKeys.secret;
-        if (!paypalClientId || !paypalSecret) {
-          return new Response(
-            JSON.stringify({
-              error: "PayPal not configured",
-              message: "Please add your PayPal API keys in Settings → Payment Providers.",
-            }),
-            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Get PayPal access token
-        const tokenRes = await fetch("https://api-m.paypal.com/v1/oauth2/token", {
-          method: "POST",
-          headers: {
-            Authorization: `Basic ${btoa(paypalClientId + ":" + paypalSecret)}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: "grant_type=client_credentials",
-        });
-        const tokenData = await tokenRes.json();
-        if (!tokenData.access_token) {
-          throw new Error("Failed to authenticate with PayPal");
-        }
-
-        const origin = req.headers.get("origin") || "https://babycam.io";
-        const orderRes = await fetch("https://api-m.paypal.com/v2/checkout/orders", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${tokenData.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            intent: "CAPTURE",
-            purchase_units: [{
-              amount: { currency_code: "USD", value: billing === "annual" ? "99.00" : "10.97" },
-              description: `BabyCam Pro ${billing === "annual" ? "Annual" : "Monthly"}`,
-              custom_id: user.id,
-            }],
-            application_context: {
-              return_url: `${origin}/dashboard?payment=success&provider=paypal`,
-              cancel_url: `${origin}/pricing?payment=canceled`,
-              brand_name: "BabyCam.io",
-            },
-          }),
-        });
-
-        const order = await orderRes.json();
-        const approveLink = order.links?.find((l: any) => l.rel === "approve");
-        if (!approveLink) {
-          throw new Error("Failed to create PayPal order");
-        }
-
-        return new Response(
-          JSON.stringify({ url: approveLink.href, provider: "paypal" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        // A PayPal approval URL alone is not a completed subscription. The backend
+        // needs a verified capture/return flow before this can safely grant Pro.
+        return json({
+          error: "PayPal checkout unavailable",
+          message: "PayPal payments are disabled until verified capture is configured.",
+        }, 503);
       }
 
       case "paymongo": {
-        const paymongoKey = Deno.env.get("PAYMONGO_SECRET_KEY") || dbKeys.secret_key;
+        const paymongoKey = Deno.env.get("PAYMONGO_SECRET_KEY");
         if (!paymongoKey) {
-          return new Response(
-            JSON.stringify({
-              error: "PayMongo not configured",
-              message: "Please add your PayMongo API keys in Settings → Payment Providers.",
-            }),
-            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          return json({
+            error: "PayMongo not configured",
+            message: "PayMongo checkout is temporarily unavailable.",
+          }, 503);
         }
 
-        const origin = req.headers.get("origin") || "https://babycam.io";
         const pmRes = await fetch("https://api.paymongo.com/v1/checkout_sessions", {
           method: "POST",
           headers: {
@@ -211,71 +155,29 @@ serve(async (req) => {
                 payment_method_types: ["gcash", "paymaya"],
                 success_url: `${origin}/dashboard?payment=success`,
                 cancel_url: `${origin}/pricing?payment=canceled`,
-                metadata: { user_id: user.id, plan },
+                metadata: { user_id: user.id, plan, billing },
               },
             },
           }),
         });
 
         const pmSession = await pmRes.json();
-        if (pmSession.errors) {
-          throw new Error(pmSession.errors[0]?.detail || "PayMongo error");
-        }
-
-        return new Response(
-          JSON.stringify({ url: pmSession.data.attributes.checkout_url, provider: "paymongo" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        if (pmSession.errors) throw new Error(pmSession.errors[0]?.detail || "PayMongo error");
+        return json({ url: pmSession.data.attributes.checkout_url, provider: "paymongo" });
       }
 
       case "mpesa": {
-        const mpesaKey = Deno.env.get("MPESA_CONSUMER_KEY") || dbKeys.consumer_key;
-        const mpesaSecret = Deno.env.get("MPESA_CONSUMER_SECRET") || dbKeys.consumer_secret;
-        if (!mpesaKey || !mpesaSecret) {
-          return new Response(
-            JSON.stringify({
-              error: "M-Pesa not configured",
-              message: "Please add your M-Pesa API keys in Settings → Payment Providers.",
-            }),
-            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // M-Pesa Daraja STK Push
-        const authRes = await fetch(
-          "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
-          {
-            headers: {
-              Authorization: `Basic ${btoa(mpesaKey + ":" + mpesaSecret)}`,
-            },
-          }
-        );
-        const authData = await authRes.json();
-        if (!authData.access_token) {
-          throw new Error("Failed to authenticate with M-Pesa");
-        }
-
-        return new Response(
-          JSON.stringify({
-            message: "M-Pesa authenticated successfully. STK Push ready.",
-            provider: "mpesa",
-            authenticated: true,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json({
+          error: "M-Pesa checkout unavailable",
+          message: "M-Pesa STK Push is not fully configured yet.",
+        }, 503);
       }
 
       default:
-        return new Response(
-          JSON.stringify({ error: "Unsupported payment provider" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json({ error: "Unsupported payment provider" }, 400);
     }
   } catch (err) {
     console.error("[CreateCheckout] Error:", err);
-    return new Response(JSON.stringify({ error: "An error occurred processing your request" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: "An error occurred processing your request" }, 500);
   }
 });
