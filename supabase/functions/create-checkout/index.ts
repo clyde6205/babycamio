@@ -41,8 +41,12 @@ function getCheckoutOrigin(req: Request): string {
 
   const requestedOrigin = normalizeOrigin(req.headers.get("origin"));
   if (requestedOrigin && configuredOrigins.includes(requestedOrigin)) return requestedOrigin;
-
   return normalizeOrigin(Deno.env.get("APP_BASE_URL")) || "https://babycam.io";
+}
+
+function configuredPhpCentavos(billing: "monthly" | "annual"): number | null {
+  const value = Number(Deno.env.get(billing === "annual" ? "PAYMONGO_ANNUAL_PHP_CENTAVOS" : "PAYMONGO_MONTHLY_PHP_CENTAVOS"));
+  return Number.isInteger(value) && value > 0 ? value : null;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -80,8 +84,6 @@ serve(async (req) => {
 
     switch (provider) {
       case "stripe": {
-        // Platform payment credentials must be server-configured. Do not use
-        // requester-provided provider_settings for platform subscriptions.
         const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
         if (!stripeKey) {
           return json({
@@ -119,8 +121,6 @@ serve(async (req) => {
       }
 
       case "paypal": {
-        // A PayPal approval URL alone is not a completed subscription. The backend
-        // needs a verified capture/return flow before this can safely grant Pro.
         return json({
           error: "PayPal checkout unavailable",
           message: "PayPal payments are disabled until verified capture is configured.",
@@ -129,10 +129,11 @@ serve(async (req) => {
 
       case "paymongo": {
         const paymongoKey = Deno.env.get("PAYMONGO_SECRET_KEY");
-        if (!paymongoKey) {
+        const phpAmount = configuredPhpCentavos(billing);
+        if (!paymongoKey || !phpAmount) {
           return json({
             error: "PayMongo not configured",
-            message: "PayMongo checkout is temporarily unavailable.",
+            message: "PayMongo PHP pricing and webhook configuration are required before checkout is enabled.",
           }, 503);
         }
 
@@ -148,7 +149,7 @@ serve(async (req) => {
               attributes: {
                 line_items: [{
                   name: `BabyCam Pro ${billing === "annual" ? "Annual" : "Monthly"}`,
-                  amount: priceAmount,
+                  amount: phpAmount,
                   currency: "PHP",
                   quantity: 1,
                 }],
