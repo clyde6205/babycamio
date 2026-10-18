@@ -61,20 +61,15 @@ serve(async (req) => {
     let room: { id: string; room_name: string; owner_id: string } | null = null;
 
     if (isPublisher) {
-      // Publishers use the stable LiveKit room slug and must own that room.
       const { data, error } = await supabase
         .from("rooms")
         .select("id, room_name, owner_id")
         .eq("room_name", roomKey)
         .maybeSingle();
       if (error || !data) return json({ error: "Camera room not found" }, 404);
-      if (!userId || data.owner_id !== userId) {
-        return json({ error: "Only the room owner can broadcast" }, 403);
-      }
+      if (!userId || data.owner_id !== userId) return json({ error: "Only the room owner can broadcast" }, 403);
       room = data;
     } else if (UUID_PATTERN.test(roomKey)) {
-      // Public share URLs use the room UUID as an unguessable bearer key. The
-      // LiveKit room slug is never exposed or accepted for anonymous viewing.
       const { data, error } = await supabase
         .from("rooms")
         .select("id, room_name, owner_id")
@@ -83,8 +78,6 @@ serve(async (req) => {
       if (error || !data) return json({ error: "Viewer link is invalid" }, 404);
       room = data;
     } else if (userId) {
-      // Signed-in owners and explicitly shared users may still open the older
-      // slug-based URL from inside the app.
       const { data, error } = await supabase
         .from("rooms")
         .select("id, room_name, owner_id")
@@ -103,9 +96,7 @@ serve(async (req) => {
             .limit(1)
         : { data: null };
 
-      if (!isOwner && !sharedAccess?.length) {
-        return json({ error: "You do not have access to this camera" }, 403);
-      }
+      if (!isOwner && !sharedAccess?.length) return json({ error: "You do not have access to this camera" }, 403);
       room = data;
     } else {
       return json({ error: "Use a current viewer link from the camera owner" }, 403);
@@ -134,7 +125,9 @@ serve(async (req) => {
       video: {
         room: room.room_name,
         roomJoin: true,
-        canPublish: isPublisher,
+        // Viewers need microphone publishing for talkback. Source restriction is
+        // what prevents them from publishing camera or screen tracks.
+        canPublish: true,
         canSubscribe: true,
         canPublishData: true,
         ...(isPublisher ? {} : { canPublishSources: ["microphone"] }),
