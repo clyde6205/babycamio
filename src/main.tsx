@@ -1,57 +1,45 @@
 import "./i18n";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
+import { isSupabaseConfigured } from "./integrations/supabase/client";
 import "./index.css";
 
-// ── Force clear stale service workers + caches on startup ────────────
-if ("serviceWorker" in navigator) {
-  // Nuke ALL service worker caches so the app always loads the latest code
-  if ("caches" in window) {
-    caches.keys().then((names) => {
-      for (const name of names) {
-        caches.delete(name);
-        console.log("[SW] Cleared cache:", name);
-      }
-    });
-  }
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (const reg of registrations) {
-      // Force activate waiting SW immediately
-      if (reg.waiting) {
-        reg.waiting.postMessage({ type: "SKIP_WAITING" });
-      }
-      // Unregister old service workers entirely to prevent stale caching
-      reg.unregister().then(() => {
-        console.log("[SW] Unregistered stale service worker");
-      });
-    }
-  });
-}
+// The PWA plugin owns service-worker registration and auto-updates. Do not
+// unregister workers here: doing so breaks installability and offline startup.
 
-// ── Global error handlers ──────────────────────────────────
-// Catch unhandled JS errors (network failures, script errors, etc.)
 window.addEventListener("error", (event) => {
   console.error("[GlobalError]", event.error ?? event.message);
 });
 
-// Catch unhandled promise rejections (failed fetches, async errors, etc.)
 window.addEventListener("unhandledrejection", (event) => {
   console.error("[UnhandledRejection]", event.reason);
-  // Prevent the browser from logging a second noisy line
   event.preventDefault();
 });
 
-// ── Android back-button handling via Capacitor ─────────────
-try {
-  import("@capacitor/app").then(({ App: CapApp }) => {
-    CapApp.addListener("backButton", ({ canGoBack }) => {
-      if (canGoBack) {
-        window.history.back();
-      } else {
-        CapApp.exitApp();
-      }
+void import("@capacitor/app")
+  .then(({ App: CapApp }) => {
+    void CapApp.addListener("backButton", ({ canGoBack }) => {
+      if (canGoBack) window.history.back();
+      else void CapApp.exitApp();
     });
-  }).catch(() => { /* Not running in Capacitor */ });
-} catch { /* Browser environment */ }
+  })
+  .catch(() => {
+    // Browser environment.
+  });
 
-createRoot(document.getElementById("root")!).render(<App />);
+const MissingConfiguration = () => (
+  <main className="flex min-h-dvh items-center justify-center bg-background px-6 py-10 text-foreground">
+    <div className="w-full max-w-md rounded-2xl border bg-card p-6 text-center shadow-sm">
+      <h1 className="text-xl font-bold">BabyCam.io is not configured</h1>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">
+        Supabase environment variables are missing. Set <code>VITE_SUPABASE_PROJECT_ID</code>,{" "}
+        <code>VITE_SUPABASE_URL</code>, and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> in the
+        deployment environment, then rebuild the app.
+      </p>
+    </div>
+  </main>
+);
+
+createRoot(document.getElementById("root")!).render(
+  isSupabaseConfigured ? <App /> : <MissingConfiguration />,
+);

@@ -5,13 +5,14 @@ const config: CapacitorConfig = {
   appName: 'BabyCam.io',
   webDir: 'dist',
   server: {
-    url: 'https://1b7444d5-9ac1-487f-9e86-e1b166f05b65.lovableproject.com?forceHideBadge=true',
-    cleartext: true,
+    // Serve the bundled app over the local HTTPS scheme. Do not commit a hosted
+    // development URL here; doing so makes every installed APK depend on that preview.
+    androidScheme: 'https',
   },
   plugins: {
     AdMob: {
-      // Replace with your real AdMob App ID before production
-      appId: 'ca-app-pub-3940256099942544~3347511713', // Test App ID
+      // Replace with the production AdMob App ID through the release environment.
+      appId: 'ca-app-pub-3940256099942544~3347511713',
     },
     SplashScreen: {
       launchAutoHide: true,
@@ -25,7 +26,7 @@ const config: CapacitorConfig = {
     },
   },
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
     backgroundColor: '#0a1628',
   },
 };

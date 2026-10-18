@@ -4,9 +4,7 @@ import { Button } from "@/components/ui/button";
 
 interface Props {
   children: ReactNode;
-  /** Optional custom fallback UI */
   fallback?: ReactNode;
-  /** Scope label shown in error UI (e.g. "Camera", "Dashboard") */
   scope?: string;
 }
 
@@ -15,10 +13,6 @@ interface State {
   error: Error | null;
 }
 
-/**
- * Catches any rendering error in its subtree and shows a recoverable
- * fallback UI instead of crashing the whole app.
- */
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -33,7 +27,7 @@ class ErrorBoundary extends Component<Props, State> {
     console.error(
       `[ErrorBoundary${this.props.scope ? `:${this.props.scope}` : ""}]`,
       error,
-      info.componentStack
+      info.componentStack,
     );
   }
 
@@ -42,7 +36,7 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   private handleGoHome = () => {
-    window.location.href = "/";
+    window.location.assign("/");
   };
 
   render() {
@@ -51,20 +45,18 @@ class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="flex min-h-[50vh] items-center justify-center p-6">
-          <div className="mx-auto max-w-md text-center space-y-4">
+          <div className="mx-auto max-w-md space-y-4 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
               <AlertTriangle className="h-7 w-7 text-destructive" />
             </div>
-            <h2 className="text-xl font-semibold text-foreground">
-              Something went wrong
-            </h2>
+            <h2 className="text-xl font-semibold text-foreground">Something went wrong</h2>
             <p className="text-sm text-muted-foreground">
               {this.props.scope
                 ? `An error occurred in the ${this.props.scope} section.`
                 : "An unexpected error occurred."}
               {" "}You can try again or return home.
             </p>
-            {process.env.NODE_ENV === "development" && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <pre className="mt-2 max-h-32 overflow-auto rounded-md bg-muted p-3 text-left text-xs text-muted-foreground">
                 {this.state.error.message}
               </pre>

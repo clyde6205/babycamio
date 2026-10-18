@@ -7,10 +7,16 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies and build output
 node_modules
 dist
 dist-ssr
 *.local
+
+# Environment files — never commit project keys or local overrides
+.env
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +28,16 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Native build artifacts and signing material
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+*.keystore
+*.jks
+*.pem
+
+# Platform metadata
+.netlify/
+.vercel/
