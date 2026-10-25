@@ -1,73 +1,117 @@
-# Welcome to your Lovable project
+# BabyCam.io
 
-## Project info
+Private baby-camera monitoring built with React, TypeScript, Vite, Tailwind CSS, shadcn/ui, Supabase, LiveKit, and Capacitor.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## What the app does
 
-## How can I edit this code?
+- Camera owners create private rooms and broadcast from a phone or browser.
+- Viewers watch through unguessable room-UUID links; no viewer account is required.
+- Owners can invite viewers by email, share QR codes, use talkback, play lullabies, record clips, and monitor camera health.
+- Supabase stores account, room, recording, invitation, subscription, and settings data behind row-level security.
+- LiveKit tokens are issued only after the edge function verifies room ownership, shared access, or a private viewer UUID.
 
-There are several ways of editing your application.
+## Local development
 
-**Use Lovable**
+Requirements:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- Node.js 20+
+- npm
+- A Supabase project
+- LiveKit Cloud credentials (or a compatible LiveKit server)
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+npm ci
+cp .env.example .env
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Fill `.env` with your local values:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+VITE_SUPABASE_PROJECT_ID=your-project-ref
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-or-publishable-key
+```
 
-**Use GitHub Codespaces**
+Never commit `.env` or service-role keys. The publishable key is safe for the browser; the service-role key is not.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Database setup
 
-## What technologies are used for this project?
+Apply every SQL file in `supabase/migrations` in filename order. The latest migrations enforce owner-only access to camera data and expose two narrow RPCs:
 
-This project is built with:
+- `validate_invitation(token)` returns an invitation's room UUID only for a valid token.
+- `get_camera_health(room_id)` returns only operational health for a private room UUID.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Anonymous users cannot read the rooms, recordings, sleep events, heartbeat, profile, invitation, payment, or subscription tables directly.
 
-## How can I deploy this project?
+## Edge functions
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Deploy the functions in `supabase/functions` with the Supabase CLI or dashboard.
 
-## Can I connect a custom domain to my Lovable project?
+Required for streaming:
 
-Yes, you can!
+```bash
+LIVEKIT_URL=wss://your-livekit-host
+LIVEKIT_API_KEY=your-livekit-api-key
+LIVEKIT_API_SECRET=your-livekit-api-secret
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Required for verified Stripe webhooks:
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```bash
+STRIPE_SECRET_KEY=...
+STRIPE_WEBHOOK_SECRET=...
+```
+
+Required for BitPay:
+
+```bash
+BITPAY_API_TOKEN=...
+BITPAY_WEBHOOK_SECRET=...
+```
+
+Optional checkout origin controls:
+
+```bash
+APP_BASE_URL=https://babycam.io
+ALLOWED_CHECKOUT_ORIGINS=https://babycam.io,https://www.babycam.io
+```
+
+Optional scheduled camera-health checks:
+
+```bash
+HEALTH_CHECK_SECRET=use-a-long-random-secret
+```
+
+Call `check-camera-health` as a scheduled POST with either the service-role bearer token or `x-health-check-secret`. PayMongo, PayPal, and M-Pesa remain disabled until their provider-specific pricing/capture/webhook configuration is completed.
+
+## Production build
+
+```bash
+npm ci
+npm run build
+```
+
+The build output is written to `dist/`.
+
+## Android app
+
+Capacitor packages the local `dist` build; the app no longer depends on an external preview URL.
+
+```bash
+npm run build
+npx cap sync android
+npx cap open android
+```
+
+Build and sign the Android app from Android Studio. Do not commit keystores, `local.properties`, or generated Android build output.
+
+## Security notes
+
+- Viewer links use room UUIDs, not guessable room slugs.
+- Publishing requires an authenticated room owner.
+- Viewer tokens can subscribe, send data, and publish microphone audio for talkback, but cannot publish camera/screen sources.
+- Stripe, PayMongo, and BitPay webhook handlers reject unsigned or unconfigured requests.
+- Checkout success/cancel URLs are restricted to an origin allow-list.
+- Supabase service-role keys belong only in edge-function secrets.
+- If an environment file was ever committed, rotate every credential it contained; deleting the file does not remove it from Git history.

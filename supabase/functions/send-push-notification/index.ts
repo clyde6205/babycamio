@@ -6,66 +6,72 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ALLOWED_ALERT_TYPES = new Set(["motion", "cry", "disconnect", "battery"]);
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    const { userId, roomName, alertType, message } = await req.json();
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceRoleKey) return json({ error: "Push service is not configured" }, 503);
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Get user's push subscriptions
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+    const token = authHeader.replace("Bearer ", "");
+
+    const { userId, roomName, alertType, message } = await req.json();
+    if (!UUID_PATTERN.test(String(userId || ""))) return json({ error: "Invalid user" }, 400);
+
+    const isServiceRole = token === serviceRoleKey;
+    if (!isServiceRole) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !user || user.id !== userId) return json({ error: "Forbidden" }, 403);
+    }
+
+    const cleanRoomName = String(roomName || "unknown").slice(0, 200);
+    const cleanAlertType = ALLOWED_ALERT_TYPES.has(alertType) ? alertType : "motion";
+    const cleanMessage = String(message || `Activity detected in ${cleanRoomName}`).slice(0, 500);
+
     const { data: subscriptions } = await supabase
       .from("push_subscriptions")
-      .select("*")
+      .select("id, platform")
       .eq("user_id", userId);
 
-    if (!subscriptions || subscriptions.length === 0) {
-      return new Response(JSON.stringify({ sent: 0, reason: "no_subscriptions" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const title = cleanAlertType === "cry"
+      ? "Baby crying"
+      : cleanAlertType === "battery"
+        ? "Camera battery low"
+        : cleanAlertType === "disconnect"
+          ? "Camera offline"
+          : "Motion detected";
+
+    // This records the notification intent. Actual Web Push/FCM delivery requires
+    // provider credentials and should remain server-side when configured.
+    for (const subscription of subscriptions || []) {
+      console.log(`[Push] Queued for ${subscription.platform}: ${title} - ${cleanMessage}`);
     }
 
-    // Also notify shared viewers
-    const { data: sharedAccess } = await supabase
-      .from("shared_access")
-      .select("shared_with_email")
-      .eq("granted_by", userId)
-      .eq("is_active", true);
-
-    let sent = 0;
-    const title = alertType === "cry" ? "🍼 Baby Crying!" : alertType === "motion" ? "⚡ Motion Detected!" : "📢 BabyCam Alert";
-    const body = message || `Activity detected in ${roomName || "your baby's room"}`;
-
-    // For now, store the notification for in-app display
-    // Full Web Push requires VAPID keys which can be configured later
-    for (const sub of subscriptions) {
-      // If FCM token exists, we could send via FCM
-      // For now, we log and return success for the notification system framework
-      console.log(`[Push] Would send to ${sub.platform}: ${title} - ${body}`);
-      sent++;
-    }
-
-    // Log the alert as a sleep event for analytics
     await supabase.from("sleep_events").insert({
       user_id: userId,
-      room_name: roomName || "unknown",
-      event_type: alertType || "motion",
+      room_name: cleanRoomName,
+      event_type: cleanAlertType,
       intensity: 1.0,
     });
 
-    return new Response(JSON.stringify({ sent, title, body }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ sent: subscriptions?.length || 0, title, body: cleanMessage });
   } catch (error) {
     console.error("[Push] Error:", error);
-    return new Response(JSON.stringify({ error: "An error occurred processing your request" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: "An error occurred processing your request" }, 500);
   }
 });

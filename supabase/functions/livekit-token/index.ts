@@ -3,133 +3,160 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Max-Age": "86400",
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TOKEN_TTL_SECONDS = 2 * 60 * 60;
+
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const cleanText = (value: unknown, maxLength: number) =>
+  String(value ?? "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .trim()
+    .slice(0, maxLength);
+
+const base64Url = (bytes: Uint8Array) =>
+  btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+const base64UrlText = (value: string) => base64Url(new TextEncoder().encode(value));
+
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    const { roomName, participantName, isPublisher } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const roomKey = cleanText(body.roomName, 200);
+    const participantName = cleanText(body.participantName, 80) || "Viewer";
+    const isPublisher = body.isPublisher === true;
 
-    if (!roomName || !participantName) {
-      return new Response(JSON.stringify({ error: "roomName and participantName required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!roomKey) return json({ error: "A room identifier is required" }, 400);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !supabaseKey) return json({ error: "Token service is not configured" }, 503);
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // --- Authentication: optional for viewers, required for publishers ---
-    let userId = "anonymous-" + crypto.randomUUID().substring(0, 8);
+    let userId: string | null = null;
+    let userEmail: string | null = null;
     const authHeader = req.headers.get("Authorization");
-
-    if (authHeader) {
-      const token = authHeader.replace("Bearer ", "");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
       const { data: { user }, error: authError } = await supabase.auth.getUser(token);
       if (!authError && user) {
         userId = user.id;
+        userEmail = user.email?.toLowerCase() ?? null;
       }
     }
 
-    // Publishers MUST be authenticated and own the room
-    if (isPublisher === true) {
-      if (userId.startsWith("anonymous-")) {
-        return new Response(JSON.stringify({ error: "Authentication required to broadcast" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    let room: { id: string; room_name: string; owner_id: string } | null = null;
 
-      const { data: room } = await supabase
+    if (isPublisher) {
+      const { data, error } = await supabase
         .from("rooms")
-        .select("owner_id")
-        .eq("room_name", roomName)
+        .select("id, room_name, owner_id")
+        .eq("room_name", roomKey)
         .maybeSingle();
+      if (error || !data) return json({ error: "Camera room not found" }, 404);
+      if (!userId || data.owner_id !== userId) return json({ error: "Only the room owner can broadcast" }, 403);
+      room = data;
+    } else if (UUID_PATTERN.test(roomKey)) {
+      const { data, error } = await supabase
+        .from("rooms")
+        .select("id, room_name, owner_id")
+        .eq("id", roomKey)
+        .maybeSingle();
+      if (error || !data) return json({ error: "Viewer link is invalid" }, 404);
+      room = data;
+    } else if (userId) {
+      const { data, error } = await supabase
+        .from("rooms")
+        .select("id, room_name, owner_id")
+        .eq("room_name", roomKey)
+        .maybeSingle();
+      if (error || !data) return json({ error: "Camera room not found" }, 404);
 
-      if (room && room.owner_id !== userId) {
-        return new Response(JSON.stringify({ error: "Only the room owner can broadcast" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const isOwner = data.owner_id === userId;
+      const { data: sharedAccess } = userEmail
+        ? await supabase
+            .from("shared_access")
+            .select("id")
+            .eq("room_id", data.id)
+            .eq("shared_with_email", userEmail)
+            .eq("is_active", true)
+            .limit(1)
+        : { data: null };
+
+      if (!isOwner && !sharedAccess?.length) return json({ error: "You do not have access to this camera" }, 403);
+      room = data;
+    } else {
+      return json({ error: "Use a current viewer link from the camera owner" }, 403);
     }
 
-    // Viewers: NO restrictions — anyone can watch from anywhere in the world
-
-    // --- Generate LiveKit JWT ---
     const apiKey = Deno.env.get("LIVEKIT_API_KEY");
     const apiSecret = Deno.env.get("LIVEKIT_API_SECRET");
     const livekitUrl = Deno.env.get("LIVEKIT_URL");
-
     if (!apiKey || !apiSecret || !livekitUrl) {
-      return new Response(
-        JSON.stringify({
-          error: "LiveKit not configured",
-          message: "LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVEKIT_URL must be set as secrets.",
-        }),
-        {
-          status: 503,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return json({
+        error: "LiveKit is not configured",
+        message: "Set LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVEKIT_URL as function secrets.",
+      }, 503);
     }
 
-    const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }))
-      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
+    const header = base64UrlText(JSON.stringify({ alg: "HS256", typ: "JWT" }));
     const now = Math.floor(Date.now() / 1000);
+    const identity = userId ?? `viewer-${crypto.randomUUID()}`;
     const payload = {
       iss: apiKey,
-      sub: userId,
+      sub: identity,
       name: participantName,
-      nbf: now,
-      exp: now + 86400,
+      nbf: now - 5,
+      exp: now + TOKEN_TTL_SECONDS,
       jti: crypto.randomUUID(),
       video: {
-        room: roomName,
+        room: room.room_name,
         roomJoin: true,
-        canPublish: isPublisher === true,
+        // Viewers need microphone publishing for talkback. Source restriction is
+        // what prevents them from publishing camera or screen tracks.
+        canPublish: true,
         canSubscribe: true,
-        canPublishData: isPublisher === true,
+        canPublishData: true,
+        ...(isPublisher ? {} : { canPublishSources: ["microphone"] }),
       },
     };
 
-    const payloadB64 = btoa(JSON.stringify(payload))
-      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-    const enc = new TextEncoder();
+    const payloadB64 = base64UrlText(JSON.stringify(payload));
     const key = await crypto.subtle.importKey(
       "raw",
-      enc.encode(apiSecret),
+      new TextEncoder().encode(apiSecret),
       { name: "HMAC", hash: "SHA-256" },
       false,
-      ["sign"]
+      ["sign"],
     );
-    const signature = await crypto.subtle.sign("HMAC", key, enc.encode(`${header}.${payloadB64}`));
-    const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-    const livekitToken = `${header}.${payloadB64}.${sigB64}`;
-
-    console.log(`[LiveKitToken] ✅ Token generated for ${isPublisher ? "publisher" : "viewer"} "${participantName}" in room "${roomName}" (user: ${userId.substring(0, 8)}…)`);
-
-    return new Response(
-      JSON.stringify({ token: livekitToken, url: livekitUrl }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    const signature = await crypto.subtle.sign(
+      "HMAC",
+      key,
+      new TextEncoder().encode(`${header}.${payloadB64}`),
     );
+
+    return json({
+      token: `${header}.${payloadB64}.${base64Url(new Uint8Array(signature))}`,
+      url: livekitUrl,
+      roomName: room.room_name,
+      roomId: room.id,
+      expiresIn: TOKEN_TTL_SECONDS,
+    });
   } catch (err) {
     console.error("[LiveKitToken] Error:", err);
-    return new Response(JSON.stringify({ error: "An error occurred processing your request" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: "Unable to create a stream token" }, 500);
   }
 });
