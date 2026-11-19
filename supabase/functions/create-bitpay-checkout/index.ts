@@ -101,6 +101,7 @@ serve(async (req) => {
         transactionSpeed: "medium",
         paymentCurrencies: ["XRP"],
         notificationURL: `${supabaseUrl}/functions/v1/bitpay-webhook`,
+        extendedNotifications: true,
         redirectURL: `${origin}/dashboard?payment=success&provider=bitpay`,
         closeURL: `${origin}/pricing?payment=canceled`,
         buyer: { email: userEmail },
