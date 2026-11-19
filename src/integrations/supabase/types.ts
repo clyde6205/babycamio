@@ -849,8 +849,18 @@ export type Database = {
         Returns: {
           expired: boolean
           opened_at: string
-          room_name: string
-          room_type: string
+          room_id: string | null
+          room_name: string | null
+          room_type: string | null
+        }[]
+      }
+      get_camera_health: {
+        Args: { _room_id: string }
+        Returns: {
+          status: string
+          battery_level: number | null
+          network_quality: string | null
+          last_heartbeat: string | null
         }[]
       }
     }
