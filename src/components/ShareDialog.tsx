@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Check, Copy, Loader2, Share2, Trash2, UserPlus } from "lucide-react";
+import { Loader2, Share2, Trash2, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SmsSender from "@/components/SmsSender";
 import { viewerLink } from "@/lib/share";
@@ -20,7 +20,6 @@ import { viewerLink } from "@/lib/share";
 interface SharedUser {
   id: string;
   shared_with_email: string;
-  access_code: string;
   is_active: boolean;
   created_at: string;
 }
@@ -39,7 +38,6 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
   const [sharing, setSharing] = useState(false);
   const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([]);
   const [loading, setLoading] = useState(false);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const friendlyName = roomName.replace(/-[a-z0-9]+$/i, "").replace(/-/g, " ") || roomName;
   const secureViewerLink = viewerLink(roomId);
 
@@ -98,11 +96,7 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
     }
   };
 
-  const copyCode = async (code: string) => {
-    await navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
-  };
+
 
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
@@ -142,12 +136,7 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
                   <div key={sharedUser.id} className={`flex items-center justify-between rounded-lg border p-2.5 text-sm ${!sharedUser.is_active ? "opacity-50" : ""}`}>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{sharedUser.shared_with_email}</p>
-                      <div className="flex items-center gap-1.5">
-                        <code className="text-xs text-muted-foreground">{sharedUser.access_code}</code>
-                        <button onClick={() => copyCode(sharedUser.access_code)} className="flex h-8 w-8 items-center justify-center" aria-label="Copy access code">
-                          {copiedCode === sharedUser.access_code ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-                        </button>
-                      </div>
+                      <p className="text-xs text-muted-foreground">Private viewer link sent by email</p>
                     </div>
                     {sharedUser.is_active ? (
                       <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive" onClick={() => revokeAccess(sharedUser.id)} aria-label="Revoke access">
