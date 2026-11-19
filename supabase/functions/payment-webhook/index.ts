@@ -76,6 +76,50 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+
+async function claimWebhookEvent(
+  supabase: ReturnType<typeof createClient>,
+  provider: string,
+  eventId: string,
+  eventType: string,
+): Promise<boolean> {
+  const { data: inserted, error: insertError } = await supabase
+    .from("payment_webhook_events")
+    .insert({ provider, event_id: eventId, event_type: eventType, status: "processing" })
+    .select("event_id")
+    .maybeSingle();
+
+  if (!insertError) return Boolean(inserted);
+  if (insertError.code !== "23505") throw insertError;
+
+  const { data: existing, error: readError } = await supabase
+    .from("payment_webhook_events")
+    .select("status, received_at")
+    .eq("provider", provider)
+    .eq("event_id", eventId)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!existing) throw new Error("Webhook event claim could not be read");
+
+  const ageMs = Date.now() - new Date(existing.received_at).getTime();
+  if (existing.status === "processed") return false;
+  if (existing.status === "processing" && ageMs < 5 * 60 * 1000) return false;
+
+  const { error: retryError } = await supabase
+    .from("payment_webhook_events")
+    .update({
+      status: "processing",
+      event_type: eventType,
+      received_at: new Date().toISOString(),
+      processed_at: null,
+      last_error: null,
+    })
+    .eq("provider", provider)
+    .eq("event_id", eventId);
+  if (retryError) throw retryError;
+  return true;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -85,6 +129,7 @@ serve(async (req) => {
   if (!supabaseUrl || !supabaseKey) return json({ error: "Webhook service is not configured" }, 503);
   const supabase = createClient(supabaseUrl, supabaseKey);
 
+  let activeEvent: { provider: string; eventId: string } | null = null;
   try {
     const url = new URL(req.url);
     const provider = url.searchParams.get("provider") || "stripe";
@@ -98,47 +143,86 @@ serve(async (req) => {
         if (!verified) return json({ error: "Invalid Stripe webhook signature" }, 401);
 
         const event = JSON.parse(rawBody);
+        if (typeof event.id !== "string" || typeof event.type !== "string") {
+          return json({ error: "Invalid Stripe event envelope" }, 400);
+        }
+        const claimed = await claimWebhookEvent(supabase, "stripe", event.id, event.type);
+        if (!claimed) return json({ received: true, duplicate: true });
+        activeEvent = { provider: "stripe", eventId: event.id };
+
         if (event.type === "checkout.session.completed") {
-          const session = event.data.object;
+          const session = event.data?.object || {};
           const userId = session.metadata?.user_id;
-          const plan = session.metadata?.plan === "pro" ? "pro" : "free";
-          const billing = session.metadata?.billing === "annual" ? "annual" : "monthly";
-          if (userId && plan === "pro") {
-            const now = new Date();
-            const periodEnd = new Date(now);
-            if (billing === "annual") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-            else periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-            await supabase.from("subscriptions").update({
-              plan,
-              status: "active",
-              payment_provider: "stripe",
-              provider_subscription_id: session.subscription,
-              provider_customer_id: session.customer,
-              current_period_start: now.toISOString(),
-              current_period_end: periodEnd.toISOString(),
-              cancel_at_period_end: false,
-            }).eq("user_id", userId);
-
-            await supabase.from("payments").insert({
-              user_id: userId,
-              amount_cents: session.amount_total || 0,
-              currency: (session.currency || "usd").toUpperCase(),
-              payment_provider: "stripe",
-              provider_payment_id: session.payment_intent || session.id,
-              status: "succeeded",
-              metadata: { stripe_event_id: event.id, billing },
-            });
+          const billing = session.metadata?.billing;
+          const expectedAmount = billing === "annual" ? 9900 : billing === "monthly" ? 1097 : 0;
+          const userIdIsValid = typeof userId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
+          if (
+            !userIdIsValid ||
+            session.metadata?.plan !== "pro" ||
+            !expectedAmount ||
+            session.mode !== "subscription" ||
+            session.status !== "complete" ||
+            session.payment_status !== "paid" ||
+            session.currency !== "usd" ||
+            session.amount_total !== expectedAmount ||
+            typeof session.subscription !== "string"
+          ) {
+            return json({ error: "Stripe checkout does not match a valid BabyCam Pro purchase" }, 400);
           }
+
+          const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+          if (!stripeKey) return json({ error: "Stripe API is not configured" }, 503);
+          const stripeSubscriptionResponse = await fetch(
+            `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(session.subscription)}`,
+            { headers: { Authorization: `Bearer ${stripeKey}` } },
+          );
+          if (!stripeSubscriptionResponse.ok) {
+            console.error("[PaymentWebhook] Stripe subscription verification failed:", stripeSubscriptionResponse.status);
+            throw new Error("Unable to verify the Stripe subscription");
+          }
+          const stripeSubscription = await stripeSubscriptionResponse.json();
+          if (!["active", "trialing"].includes(stripeSubscription.status)) {
+            return json({ error: "Stripe subscription is not active" }, 409);
+          }
+          const periodStart = new Date(Number(stripeSubscription.current_period_start) * 1000);
+          const periodEnd = new Date(Number(stripeSubscription.current_period_end) * 1000);
+          if (!Number.isFinite(periodStart.getTime()) || !Number.isFinite(periodEnd.getTime()) || periodEnd <= periodStart) {
+            throw new Error("Stripe returned an invalid subscription period");
+          }
+
+          const { error: subscriptionError } = await supabase.from("subscriptions").upsert({
+            user_id: userId,
+            plan: "pro",
+            status: stripeSubscription.status === "trialing" ? "trialing" : "active",
+            payment_provider: "stripe",
+            provider_subscription_id: stripeSubscription.id,
+            provider_customer_id: session.customer || stripeSubscription.customer,
+            current_period_start: periodStart.toISOString(),
+            current_period_end: periodEnd.toISOString(),
+            cancel_at_period_end: Boolean(stripeSubscription.cancel_at_period_end),
+          }, { onConflict: "user_id" });
+          if (subscriptionError) throw subscriptionError;
+
+          const { error: paymentError } = await supabase.from("payments").insert({
+            user_id: userId,
+            amount_cents: session.amount_total,
+            currency: session.currency.toUpperCase(),
+            payment_provider: "stripe",
+            provider_payment_id: session.id,
+            status: "succeeded",
+            metadata: { stripe_event_id: event.id, billing, stripe_subscription_id: stripeSubscription.id },
+          });
+          if (paymentError) throw paymentError;
         }
 
         if (event.type === "customer.subscription.deleted") {
           const subscription = event.data.object;
-          await supabase.from("subscriptions").update({
+          const { error } = await supabase.from("subscriptions").update({
             plan: "free",
             status: "canceled",
             cancel_at_period_end: false,
           }).eq("provider_subscription_id", subscription.id);
+          if (error) throw error;
         }
         break;
       }
@@ -150,6 +234,12 @@ serve(async (req) => {
         if (!verified) return json({ error: "Invalid PayMongo webhook signature" }, 401);
 
         const event = JSON.parse(rawBody);
+        if (typeof event.id !== "string" || typeof event.type !== "string") {
+          return json({ error: "Invalid PayMongo event envelope" }, 400);
+        }
+        const claimed = await claimWebhookEvent(supabase, "paymongo", event.id, event.type);
+        if (!claimed) return json({ received: true, duplicate: true });
+        activeEvent = { provider: "paymongo", eventId: event.id };
         const eventAttributes = event.data?.attributes || {};
         const eventType = eventAttributes.type || event.data?.type;
         const resource = eventAttributes.data || event.data || {};
@@ -195,8 +285,26 @@ serve(async (req) => {
         return json({ error: "Unsupported payment provider" }, 400);
     }
 
+    if (activeEvent) {
+      const { error: completeError } = await supabase
+        .from("payment_webhook_events")
+        .update({ status: "processed", processed_at: new Date().toISOString(), last_error: null })
+        .eq("provider", activeEvent.provider)
+        .eq("event_id", activeEvent.eventId);
+      if (completeError) throw completeError;
+      activeEvent = null;
+    }
     return json({ received: true });
   } catch (err) {
+    if (activeEvent) {
+      const message = err instanceof Error ? err.message : "Unknown webhook processing error";
+      const { error: failedError } = await supabase
+        .from("payment_webhook_events")
+        .update({ status: "failed", last_error: message.slice(0, 1000) })
+        .eq("provider", activeEvent.provider)
+        .eq("event_id", activeEvent.eventId);
+      if (failedError) console.error("[PaymentWebhook] Could not mark event failed:", failedError);
+    }
     console.error("[PaymentWebhook] Error:", err);
     return json({ error: "An error occurred processing your request" }, 500);
   }
