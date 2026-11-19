@@ -73,7 +73,7 @@ const ConnectionStatus = ({ connectionState, onDisconnectAlarm }: ConnectionStat
     setAlarmActive(false);
     try {
       oscRef.current?.stop();
-    } catch {}
+    } catch { /* oscillator may already be stopped */ }
     oscRef.current = null;
     audioCtxRef.current?.close();
     audioCtxRef.current = null;
