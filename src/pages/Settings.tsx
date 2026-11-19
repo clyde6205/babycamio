@@ -22,10 +22,6 @@ interface ProviderConfig {
 
 const PROVIDERS: ProviderConfig[] = [
   { id: "twilio", name: "Twilio SMS", icon: "📱", description: "Send & receive SMS worldwide", keys: [{ name: "account_sid", label: "Account SID", placeholder: "AC..." }, { name: "auth_token", label: "Auth Token", placeholder: "Your auth token" }, { name: "phone_number", label: "Twilio Phone Number", placeholder: "+1234567890" }] },
-  { id: "stripe", name: "Stripe", icon: "💳", description: "Credit/Debit cards — Global", keys: [{ name: "secret_key", label: "Secret Key", placeholder: "sk_live_..." }, { name: "webhook_secret", label: "Webhook Secret", placeholder: "whsec_..." }] },
-  { id: "paypal", name: "PayPal", icon: "🅿️", description: "PayPal payments — Global", keys: [{ name: "client_id", label: "Client ID", placeholder: "AX..." }, { name: "secret", label: "Secret", placeholder: "EL..." }] },
-  { id: "paymongo", name: "PayMongo (GCash/Maya)", icon: "🇵🇭", description: "GCash & Maya — Philippines", keys: [{ name: "secret_key", label: "Secret Key", placeholder: "sk_live_..." }, { name: "webhook_secret", label: "Webhook Secret (optional)", placeholder: "whsec_..." }] },
-  { id: "mpesa", name: "M-Pesa", icon: "🇰🇪", description: "Mobile Money — Kenya, Tanzania, Africa", keys: [{ name: "consumer_key", label: "Consumer Key", placeholder: "Consumer key from Daraja" }, { name: "consumer_secret", label: "Consumer Secret", placeholder: "Consumer secret from Daraja" }, { name: "shortcode", label: "Business Shortcode", placeholder: "174379" }, { name: "passkey", label: "Passkey", placeholder: "Lipa na M-Pesa passkey" }] },
 ];
 
 const Settings = () => {
@@ -261,6 +257,7 @@ const Settings = () => {
             <h1 className="text-2xl font-bold">{t("settings.paymentProviders")}</h1>
           </div>
           <p className="text-sm text-muted-foreground">{t("settings.desc")}</p>
+          <p className="mt-2 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">Payment processing is managed by BabyCam.io. Stripe, PayMongo, PayPal, M-Pesa, and BitPay credentials must be configured as secure deployment secrets by the platform operator; personal settings keys do not activate checkout.</p>
         </div>
 
         <div className="space-y-4">
