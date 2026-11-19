@@ -23,7 +23,9 @@ export default defineConfig(({ mode }) => ({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
+        // Precache the app shell and code only; media is cached on demand for slow mobile data.
+        globPatterns: ["**/*.{js,css,html,ico,webmanifest}"],
+        maximumFileSizeToCacheInBytes: 768 * 1024,
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api/, /^\/functions/, /^https:\/\/.*\.supabase\.co/],
         ignoreURLParametersMatching: [/^utm_/, /^fbclid$/],
@@ -39,6 +41,15 @@ export default defineConfig(({ mode }) => ({
             options: {
               cacheName: "google-fonts-webfonts",
               expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+          {
+            urlPattern: /\\.(?:png|jpe?g|webp|avif|gif)$/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "babycam-images",
+              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
             },
           },
         ],
