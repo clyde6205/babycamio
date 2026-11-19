@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,7 +67,7 @@ const Dashboard = () => {
     if (!localStorage.getItem("babycam_onboarded")) setShowOnboarding(true);
   }, []);
 
-  const fetchRooms = async () => {
+  const fetchRooms = useCallback(async () => {
     if (!user) {
       setRooms([]);
       setSharedRooms([]);
@@ -92,7 +92,7 @@ const Dashboard = () => {
       setSharedRooms((sharedResult.data || []) as Room[]);
     }
     setLoading(false);
-  };
+  }, [user, toast, t]);
 
   useEffect(() => {
     const load = async () => {
@@ -108,7 +108,7 @@ const Dashboard = () => {
       await fetchRooms();
     };
     if (!authLoading) void load();
-  }, [user, authLoading]);
+  }, [user, authLoading, fetchRooms]);
 
   const createRoom = async () => {
     const label = newRoomName.trim().replace(/\s+/g, " ");
