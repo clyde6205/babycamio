@@ -146,7 +146,7 @@ const Settings = () => {
       setSavedProviders((prev) => new Set([...prev, provider.id]));
       toast({ title: `${provider.name} configured`, description: t("settings.keysSaved") });
     } catch (err: unknown) {
-      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: err instanceof Error ? err.message : String(err), variant: "destructive" });
     } finally { setSaving(null); }
   };
 
@@ -160,7 +160,7 @@ const Settings = () => {
       setSavedProviders((prev) => { const next = new Set(prev); next.delete(providerId); return next; });
       toast({ title: t("settings.providerRemoved") });
     } catch (err: unknown) {
-      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: err instanceof Error ? err.message : String(err), variant: "destructive" });
     } finally { setSaving(null); }
   };
 
