@@ -425,7 +425,6 @@ const Dashboard = () => {
       </main>
 
       <AdBanner />
-}
       <CopyrightFooter variant="dark" showLinks={false} />
     </div>
   );
