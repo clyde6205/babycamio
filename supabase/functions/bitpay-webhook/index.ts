@@ -45,6 +45,7 @@ serve(async (req) => {
     const invoiceResponseBody = await invoiceResponse.json();
     const invoiceData = invoiceResponseBody.data || invoiceResponseBody;
     if (invoiceData.id !== invoiceId) return json({ error: "BitPay invoice ID mismatch" }, 400);
+    if (invoiceData.currency !== "USD") return json({ error: "BitPay invoice currency does not match USD pricing" }, 400);
     const event = notification.event?.name || notification.status;
 
     const status = invoiceData.status;
@@ -85,12 +86,13 @@ serve(async (req) => {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existingPayment } = await supabase
+    const { data: existingPayment, error: existingPaymentError } = await supabase
       .from("payments")
       .select("id")
       .eq("provider_payment_id", invoiceId)
       .eq("payment_provider", "bitpay")
       .maybeSingle();
+    if (existingPaymentError) throw existingPaymentError;
 
     if (existingPayment) {
       const { error } = await supabase.from("payments").update({ status: paymentStatus, metadata: paymentMetadata }).eq("id", existingPayment.id);
