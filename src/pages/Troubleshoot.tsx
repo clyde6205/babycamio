@@ -21,8 +21,7 @@ const Troubleshoot = () => {
     const { data, error: err } = await supabase.functions.invoke("troubleshoot-error", { body: { error, context } });
     let msg = data?.error as string | undefined;
     if (err && !msg) {
-      try { msg = (await (err as any).context?.json())?.error; } catch { /* ignore */ }
-      msg ||= "Couldn't reach the helper. Check your connection and try again.";
+      msg = err.message || "Could not reach the helper. Check your connection and try again.";
     }
     if (msg) setFail(msg); else setAnswer(data?.answer ?? "");
     setLoading(false);
