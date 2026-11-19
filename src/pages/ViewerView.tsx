@@ -291,6 +291,7 @@ const ViewerView = () => {
   const isReconnecting = connectionState === ConnectionState.Reconnecting;
   const friendlyName = resolvedRoomName ? friendlyRoomName(resolvedRoomName) : "Private Camera";
   const viewerUrl = viewerLink(roomName || "");
+  const canShareViewerLink = Boolean(roomName && resolvedRoomId && roomName !== resolvedRoomId);
 
   return (
     <div ref={containerRef} className="flex min-h-[100dvh] select-none flex-col bg-black text-white">
@@ -426,10 +427,12 @@ const ViewerView = () => {
             <TalkbackButton room={room} isConnected={isConnected} />
             <NightVisionToggle videoRef={videoRef} />
             <LullabyPlayer room={room} isConnected={isConnected} />
-            <button onClick={() => setShowShareQR(true)} className="touch-target flex flex-col items-center gap-1.5">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/80"><Share2 className="h-5 w-5" /></div>
-              <span className="text-[10px] opacity-60">Share</span>
-            </button>
+            {canShareViewerLink && (
+              <button onClick={() => setShowShareQR(true)} className="touch-target flex flex-col items-center gap-1.5">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/80"><Share2 className="h-5 w-5" /></div>
+                <span className="text-[10px] opacity-60">Share</span>
+              </button>
+            )}
             <button onClick={toggleFullscreen} className="touch-target flex flex-col items-center gap-1.5">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15">
                 {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
