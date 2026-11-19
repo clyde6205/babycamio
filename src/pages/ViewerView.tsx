@@ -26,6 +26,8 @@ const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
   }
 };
 
+const VIEWER_RECORD_DURATION = 5 * 60;
+
 const friendlyRoomName = (roomName: string) =>
   roomName.replace(/-[a-z0-9]+$/i, "").replace(/-/g, " ") || roomName;
 
@@ -57,7 +59,6 @@ const ViewerView = () => {
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
   const countdownRef = useRef<number | null>(null);
-  const VIEWER_RECORD_DURATION = 5 * 60;
 
   const [cameraHealth, setCameraHealth] = useState<{
     status: string;
@@ -124,7 +125,7 @@ const ViewerView = () => {
     let cancelled = false;
 
     const loadHealth = async () => {
-      const { data } = await (supabase as any).rpc("get_camera_health", { _room_id: resolvedRoomId });
+      const { data } = await supabase.rpc("get_camera_health", { _room_id: resolvedRoomId });
       if (!cancelled && Array.isArray(data) && data[0]) {
         setCameraHealth(data[0]);
       }
@@ -208,7 +209,7 @@ const ViewerView = () => {
     const videoEl = videoRef.current;
     let stream: MediaStream | null = null;
     if (videoEl.srcObject instanceof MediaStream) stream = videoEl.srcObject;
-    else if ((videoEl as any).captureStream) stream = (videoEl as any).captureStream();
+    else if (typeof videoEl.captureStream === "function") stream = videoEl.captureStream();
 
     if (audioRef.current?.srcObject instanceof MediaStream) {
       const audioTracks = (audioRef.current.srcObject as MediaStream).getAudioTracks();
