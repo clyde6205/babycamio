@@ -12,9 +12,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Loader2, Share2, Trash2, UserPlus } from "lucide-react";
+import { Check, Copy, Loader2, Share2, Trash2, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import SmsSender from "@/components/SmsSender";
 import { viewerLink } from "@/lib/share";
 
 interface SharedUser {
@@ -38,8 +37,8 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
   const [sharing, setSharing] = useState(false);
   const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([]);
   const [loading, setLoading] = useState(false);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const friendlyName = roomName.replace(/-[a-z0-9]+$/i, "").replace(/-/g, " ") || roomName;
-  const secureViewerLink = viewerLink(roomId);
 
   const loadSharedUsers = async () => {
     setLoading(true);
@@ -64,7 +63,8 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
     setSharing(true);
 
     try {
-      const code = crypto.randomUUID().slice(0, 8).toUpperCase();
+      const code = crypto.randomUUID();
+      const privateLink = viewerLink(code);
       const { error } = await supabase.from("shared_access").insert({
         room_id: roomId,
         granted_by: userId,
@@ -74,7 +74,7 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
       if (error) throw error;
 
       const mail = document.createElement("a");
-      mail.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(`Watch "${friendlyName}" live on BabyCam.io`)}&body=${encodeURIComponent(`Hi!\n\nYou've been invited to watch my baby camera "${friendlyName}" live.\n\nOpen this private link (no download or account needed):\n${secureViewerLink}\n\nKeep this link private.\n\nSent with BabyCam.io`)}`;
+      mail.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(`Watch "${friendlyName}" live on BabyCam.io`)}&body=${encodeURIComponent(`Hi!\n\nYou've been invited to watch my baby camera "${friendlyName}" live.\n\nOpen this private link (no download or account needed):\n${privateLink}\n\nKeep this link private.\n\nSent with BabyCam.io`)}`;
       document.body.appendChild(mail);
       mail.click();
       mail.remove();
@@ -136,7 +136,24 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
                   <div key={sharedUser.id} className={`flex items-center justify-between rounded-lg border p-2.5 text-sm ${!sharedUser.is_active ? "opacity-50" : ""}`}>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{sharedUser.shared_with_email}</p>
-                      <p className="text-xs text-muted-foreground">Private viewer link sent by email</p>
+                      <div className="flex items-center gap-2">
+                        <p className="min-w-0 flex-1 text-xs text-muted-foreground">Revocable private link</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-9 shrink-0"
+                          onClick={async () => {
+                            const link = viewerLink(sharedUser.access_code);
+                            await navigator.clipboard.writeText(link);
+                            setCopiedLink(sharedUser.id);
+                            window.setTimeout(() => setCopiedLink(null), 2000);
+                          }}
+                        >
+                          {copiedLink === sharedUser.id ? <Check className="mr-1 h-3 w-3" /> : <Copy className="mr-1 h-3 w-3" />}
+                          Copy link
+                        </Button>
+                      </div>
                     </div>
                     {sharedUser.is_active ? (
                       <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive" onClick={() => revokeAccess(sharedUser.id)} aria-label="Revoke access">
@@ -151,25 +168,10 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
             )}
           </div>
 
-          <SmsSender defaultMessage={`Watch my baby camera "${friendlyName}" live now with this private link: ${secureViewerLink}`} />
 
-          {typeof navigator.share === "function" && (
-            <Button variant="secondary" className="w-full" onClick={() => {
-              void navigator.share({
-                title: `BabyCam - ${friendlyName}`,
-                text: `Watch my baby camera "${friendlyName}" live with this private link:`,
-                url: secureViewerLink,
-              }).catch(() => {});
-            }}>
-              <Share2 className="mr-2 h-4 w-4" /> Share via Apps
-            </Button>
-          )}
+}
 
-          <div className="rounded-lg bg-muted/50 p-3">
-            <p className="break-all text-xs text-muted-foreground">
-              Private viewer link: <code className="text-foreground">{secureViewerLink}</code>
-            </p>
-          </div>
+
         </div>
       </DialogContent>
     </Dialog>
