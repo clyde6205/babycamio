@@ -123,13 +123,6 @@ serve(async (req) => {
       if (billing === "annual") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
       else periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-      const { error: subscriptionLookupError } = await supabase
-        .from("subscriptions")
-        .select("id")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (subscriptionLookupError) throw subscriptionLookupError;
-
       const { error: subscriptionWriteError } = await supabase.from("subscriptions").upsert({
         user_id: userId,
         plan: "pro",
