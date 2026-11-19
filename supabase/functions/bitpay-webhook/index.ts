@@ -69,6 +69,13 @@ serve(async (req) => {
     }
 
     const paymentStatus = mapBitPayStatus(status);
+    const invoiceCreatedAt = Number(invoiceData.invoiceTime);
+    if (
+      (status === "confirmed" || status === "complete") &&
+      (!Number.isFinite(invoiceCreatedAt) || invoiceCreatedAt <= 0)
+    ) {
+      return json({ error: "Verified BitPay invoice is missing its creation time" }, 400);
+    }
     const amountCents = Number.isFinite(Number(invoiceData.price)) ? Math.round(Number(invoiceData.price) * 100) : 0;
     if (amountCents !== 1097 && amountCents !== 9900) {
       return json({ error: "BitPay invoice amount does not match an available plan" }, 400);
@@ -114,10 +121,6 @@ serve(async (req) => {
     if ((status === "confirmed" || status === "complete") && plan === "pro") {
       // Anchor the subscription window to the immutable invoice creation time
       // so repeated IPN deliveries do not extend the subscription repeatedly.
-      const invoiceCreatedAt = Number(invoiceData.invoiceTime);
-      if (!Number.isFinite(invoiceCreatedAt) || invoiceCreatedAt <= 0) {
-        throw new Error("Verified BitPay invoice is missing its immutable creation time");
-      }
       const periodStart = new Date(invoiceCreatedAt);
       const periodEnd = new Date(periodStart);
       if (billing === "annual") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
