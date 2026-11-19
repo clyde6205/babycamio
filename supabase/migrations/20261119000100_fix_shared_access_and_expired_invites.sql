@@ -34,10 +34,7 @@ USING (
 )
 WITH CHECK (
   granted_by = auth.uid()
-  AND EXISTS (
-    SELECT 1 FROM public.rooms r
-    WHERE r.id = shared_access.room_id AND r.owner_id = auth.uid()
-  )
+  AND public.is_room_owner(shared_access.room_id)
 );
 
 CREATE POLICY "Recipients read their active shared access"
@@ -61,10 +58,7 @@ USING (
 )
 WITH CHECK (
   owner_id = auth.uid()
-  AND EXISTS (
-    SELECT 1 FROM public.rooms r
-    WHERE r.id = camera_invitations.room_id AND r.owner_id = auth.uid()
-  )
+  AND public.is_room_owner(camera_invitations.room_id)
 );
 
 -- The room UUID is a viewer capability in the current implementation. Never
