@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
     }
 
     const creds: Record<string, string> = {};
-    twilioSettings.forEach((row: any) => {
+    twilioSettings.forEach((row) => {
       creds[row.key_name] = row.key_value;
     });
 

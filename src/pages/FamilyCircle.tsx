@@ -7,6 +7,12 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Users, Plus, Copy, Check, Trash2, Loader2, Heart, Mail, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { viewerLink } from "@/lib/share";
+
+interface RoomOption {
+  id: string;
+  room_name: string;
+}
 
 interface SharedViewer {
   id: string;
@@ -22,7 +28,7 @@ const FamilyCircle = () => {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAutoAuth();
   const [viewers, setViewers] = useState<SharedViewer[]>([]);
-  const [rooms, setRooms] = useState<any[]>([]);
+  const [rooms, setRooms] = useState<RoomOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [selectedRoom, setSelectedRoom] = useState("");
@@ -37,13 +43,13 @@ const FamilyCircle = () => {
         supabase.from("shared_access").select("*").eq("granted_by", user.id),
       ]);
       if (roomsData) {
-        setRooms(roomsData);
-        if (roomsData.length > 0 && !selectedRoom) setSelectedRoom(roomsData[0].id);
+        setRooms(roomsData as RoomOption[]);
+        if (roomsData.length > 0) setSelectedRoom((current) => current || roomsData[0].id);
       }
       if (sharedData) {
-        const enriched = sharedData.map((s: any) => ({
-          ...s,
-          room_name: roomsData?.find((r: any) => r.id === s.room_id)?.room_name || "Unknown",
+        const enriched = sharedData.map((share) => ({
+          ...share,
+          room_name: roomsData?.find((room) => room.id === share.room_id)?.room_name || "Unknown",
         }));
         setViewers(enriched);
       }
@@ -55,48 +61,60 @@ const FamilyCircle = () => {
   const addViewer = async () => {
     if (!email.trim() || !selectedRoom || !user) return;
     setAdding(true);
-    const code = Math.random().toString(36).slice(2, 8).toUpperCase();
-    const { error } = await supabase.from("shared_access").insert({
+    const normalizedEmail = email.trim().toLowerCase();
+    const shareToken = crypto.randomUUID();
+    const privateLink = viewerLink(shareToken);
+    const { data: created, error } = await supabase.from("shared_access").insert({
       room_id: selectedRoom,
-      shared_with_email: email.trim(),
-      access_code: code,
+      shared_with_email: normalizedEmail,
+      access_code: shareToken,
       granted_by: user.id,
-    });
-    if (error) {
-      toast({ title: "Failed to add", description: error.message, variant: "destructive" });
+    }).select("id, room_id, shared_with_email, is_active, access_code").single();
+
+    if (error || !created) {
+      toast({ title: "Failed to add", description: error?.message || "Could not create a private viewer link.", variant: "destructive" });
     } else {
       const room = rooms.find((r) => r.id === selectedRoom);
-      setViewers((prev) => [...prev, {
-        id: code, shared_with_email: email, is_active: true, access_code: code,
-        room_id: selectedRoom, room_name: room?.room_name || "",
-      }]);
+      setViewers((prev) => [...prev, { ...created, room_name: room?.room_name || "" }]);
       setEmail("");
-      toast({ title: "Family member added! 👨‍👩‍👧" });
+      toast({ title: "Private viewer link created", description: "Share the link with " + normalizedEmail + ". You can revoke it at any time." });
 
-      // Try to share via native share
       if (navigator.share) {
         try {
           await navigator.share({
-            title: "BabyCam.io - You're invited!",
-            text: `You've been invited to watch the baby cam! Access code: ${code}. Room: ${room?.room_name}`,
-            url: window.location.origin,
+            title: "BabyCam.io - Private viewer invitation",
+            text: "You've been invited to watch " + (room?.room_name || "this camera") + " on BabyCam.io. This private link can be revoked by the camera owner.",
+            url: privateLink,
           });
-        } catch {}
+        } catch {
+          // The private link remains available from the Copy link control.
+        }
       }
     }
     setAdding(false);
   };
 
   const removeViewer = async (id: string) => {
-    await supabase.from("shared_access").delete().eq("id", id);
-    setViewers((prev) => prev.filter((v) => v.id !== id));
+    const { error } = await supabase.from("shared_access")
+      .update({ is_active: false })
+      .eq("id", id)
+      .eq("granted_by", user?.id || "");
+    if (error) {
+      toast({ title: "Could not revoke access", description: error.message, variant: "destructive" });
+      return;
+    }
+    setViewers((prev) => prev.map((viewer) => viewer.id === id ? { ...viewer, is_active: false } : viewer));
     toast({ title: "Access revoked" });
   };
 
-  const copyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedId(code);
-    setTimeout(() => setCopiedId(null), 2000);
+  const copyViewerLink = async (viewer: SharedViewer) => {
+    try {
+      await navigator.clipboard.writeText(viewerLink(viewer.access_code));
+      setCopiedId(viewer.id);
+      window.setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      toast({ title: "Copy unavailable", description: "Clipboard access is unavailable on this device.", variant: "destructive" });
+    }
   };
 
   const FAMILY_ROLES = ["👵 Grandma", "👴 Grandpa", "👩 Aunt", "👨 Uncle", "🧑‍🍼 Nanny", "👫 Friend"];
@@ -161,16 +179,20 @@ const FamilyCircle = () => {
                     <Mail className="h-4 w-4 text-muted-foreground" /> {v.shared_with_email}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Room: {v.room_name?.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")} · Code: {v.access_code}
+                    Room: {v.room_name?.replace(/-[a-z0-9]+$/, "").replace(/-/g, " ")} · {v.is_active ? "Private link active" : "Access revoked"}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copyCode(v.access_code)}>
-                    {copiedId === v.access_code ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => removeViewer(v.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {v.is_active && (
+                    <>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => void copyViewerLink(v)} aria-label="Copy private viewer link">
+                        {copiedId === v.id ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => void removeViewer(v.id)} aria-label="Revoke viewer access">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             </Card>

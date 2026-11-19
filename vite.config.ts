@@ -1,7 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
-import path from "path";
-import { componentTagger } from "lovable-tagger";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
@@ -15,7 +16,6 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
@@ -23,7 +23,10 @@ export default defineConfig(({ mode }) => ({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
+        // Precache the app shell and code only; media is cached on demand for slow mobile data.
+        // Lean install: preload only the shell and initial entry dependencies.
+        globPatterns: ["**/*.{css,html,ico,webmanifest}", "assets/index-*.js", "assets/vendor-react-*.js", "assets/vendor-ui-*.js", "assets/vendor-query-*.js"],
+        maximumFileSizeToCacheInBytes: 1024 * 1024,
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api/, /^\/functions/, /^https:\/\/.*\.supabase\.co/],
         ignoreURLParametersMatching: [/^utm_/, /^fbclid$/],
@@ -39,6 +42,20 @@ export default defineConfig(({ mode }) => ({
             options: {
               cacheName: "google-fonts-webfonts",
               expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+          {
+            urlPattern: ({ request, url }) => request.destination === "script" && url.pathname.startsWith("/assets/"),
+            handler: "CacheFirst",
+            options: { cacheName: "babycam-route-chunks", expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 30 } },
+          },
+          {
+            urlPattern: /\.(?:png|jpe?g|webp|avif|gif)$/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "babycam-images",
+              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
             },
           },
         ],
@@ -73,11 +90,12 @@ export default defineConfig(({ mode }) => ({
     cssMinify: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-ui": ["@radix-ui/react-dialog", "@radix-ui/react-popover", "@radix-ui/react-tooltip", "@radix-ui/react-select"],
-          "vendor-charts": ["recharts"],
-          "vendor-query": ["@tanstack/react-query"],
+        manualChunks(id) {
+          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/") || id.includes("node_modules/react-router")) return "vendor-react";
+          if (id.includes("node_modules/@radix-ui/")) return "vendor-ui";
+          // Keep Recharts with its lazy analytics route. A shared vendor chunk
+          // made Vite preload the charting library on the public landing page.
+          if (id.includes("node_modules/@tanstack/react-query/")) return "vendor-query";
         },
       },
     },

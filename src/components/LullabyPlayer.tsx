@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Music, Pause, Play, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -119,10 +119,10 @@ const LullabyPlayer = ({ room, isConnected }: LullabyPlayerProps) => {
     }
   };
 
-  const stopSound = () => {
+  const stopSound = useCallback(() => {
     try {
       sourceRef.current?.stop?.();
-    } catch {}
+    } catch { /* audio source may already be stopped */ }
     sourceRef.current = null;
     audioContextRef.current?.close();
     audioContextRef.current = null;
@@ -132,7 +132,7 @@ const LullabyPlayer = ({ room, isConnected }: LullabyPlayerProps) => {
       const msg = JSON.stringify({ type: "lullaby", action: "stop" });
       room.localParticipant.publishData(new TextEncoder().encode(msg), { reliable: true });
     }
-  };
+  }, [room, isConnected]);
 
   useEffect(() => {
     if (gainRef.current) gainRef.current.gain.value = volume / 100;
@@ -140,7 +140,7 @@ const LullabyPlayer = ({ room, isConnected }: LullabyPlayerProps) => {
 
   useEffect(() => {
     return () => { stopSound(); };
-  }, []);
+  }, [stopSound]);
 
   return (
     <div className="w-full">

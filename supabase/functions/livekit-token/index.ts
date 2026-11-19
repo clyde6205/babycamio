@@ -18,8 +18,12 @@ const json = (data: unknown, status = 200) =>
   });
 
 const cleanText = (value: unknown, maxLength: number) =>
-  String(value ?? "")
-    .replace(/[\u0000-\u001f\u007f]/g, "")
+  Array.from(String(value ?? ""))
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code > 31 && code !== 127;
+    })
+    .join("")
     .trim()
     .slice(0, maxLength);
 
@@ -70,12 +74,61 @@ serve(async (req) => {
       if (!userId || data.owner_id !== userId) return json({ error: "Only the room owner can broadcast" }, 403);
       room = data;
     } else if (UUID_PATTERN.test(roomKey)) {
+      // UUID-shaped viewer links are per-invitation share tokens, not room IDs.
+      // Revoking the shared_access row immediately prevents future token issuance.
+      const { data: shareGrant } = await supabase
+        .from("shared_access")
+        .select("room_id")
+        .eq("access_code", roomKey)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (shareGrant?.room_id) {
+        const { data, error } = await supabase
+          .from("rooms")
+          .select("id, room_name, owner_id")
+          .eq("id", shareGrant.room_id)
+          .maybeSingle();
+        if (error || !data) return json({ error: "Viewer link is invalid" }, 404);
+        room = data;
+      } else {
+        // Room UUIDs remain usable by the owner and authenticated family members
+        // with an active grant; anonymous users must use an invitation token.
+        const { data, error } = await supabase
+          .from("rooms")
+          .select("id, room_name, owner_id")
+          .eq("id", roomKey)
+          .maybeSingle();
+        if (error || !data) return json({ error: "Viewer link is invalid" }, 404);
+        const isOwner = userId === data.owner_id;
+        const { data: sharedAccess } = userEmail
+          ? await supabase
+              .from("shared_access")
+              .select("id")
+              .eq("room_id", data.id)
+              .eq("shared_with_email", userEmail)
+              .eq("is_active", true)
+              .limit(1)
+          : { data: null };
+        if (!isOwner && !sharedAccess?.length) return json({ error: "Viewer link is invalid or has been revoked" }, 403);
+        room = data;
+      }
+    } else if (/^[0-9a-f]{48}$/i.test(roomKey)) {
+      // Email invitations use high-entropy 48-character tokens. Validate expiry
+      // again here; the landing-page RPC is not an authorization boundary.
+      const { data: invitation, error: invitationError } = await supabase
+        .from("camera_invitations")
+        .select("room_id")
+        .eq("token", roomKey)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
+      if (invitationError || !invitation) return json({ error: "Invitation is invalid or has expired" }, 403);
       const { data, error } = await supabase
         .from("rooms")
         .select("id, room_name, owner_id")
-        .eq("id", roomKey)
+        .eq("id", invitation.room_id)
         .maybeSingle();
-      if (error || !data) return json({ error: "Viewer link is invalid" }, 404);
+      if (error || !data) return json({ error: "Camera room not found" }, 404);
       room = data;
     } else if (userId) {
       const { data, error } = await supabase
@@ -129,7 +182,9 @@ serve(async (req) => {
         // what prevents them from publishing camera or screen tracks.
         canPublish: true,
         canSubscribe: true,
-        canPublishData: true,
+        // Viewer clients must never publish control/alert data. Talkback only needs
+        // microphone media publishing, not LiveKit data packets.
+        canPublishData: isPublisher,
         ...(isPublisher ? {} : { canPublishSources: ["microphone"] }),
       },
     };

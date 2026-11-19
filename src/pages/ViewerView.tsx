@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, Volume2, VolumeX, Loader2, RefreshCw, Maximize2, Minimize2,
   SignalHigh, SignalMedium, SignalLow, WifiOff, Activity, Baby, Heart, BatteryWarning,
-  Share2, Circle,
+  Circle,
 } from "lucide-react";
-import ShareSheet from "@/components/ShareSheet";
 import { useLiveKit, type NetworkQuality } from "@/hooks/use-livekit";
 import { ConnectionState, RoomEvent, Track } from "livekit-client";
 import TalkbackButton from "@/components/TalkbackButton";
@@ -16,7 +15,6 @@ import NightVisionToggle from "@/components/NightVisionToggle";
 import LullabyPlayer from "@/components/LullabyPlayer";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { useToast } from "@/hooks/use-toast";
-import { viewerLink } from "@/lib/share";
 
 const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
   switch (quality) {
@@ -27,6 +25,8 @@ const NetworkQualityIcon = ({ quality }: { quality: NetworkQuality }) => {
     default: return <WifiOff className="h-4 w-4 text-red-400" />;
   }
 };
+
+const VIEWER_RECORD_DURATION = 5 * 60;
 
 const friendlyRoomName = (roomName: string) =>
   roomName.replace(/-[a-z0-9]+$/i, "").replace(/-/g, " ") || roomName;
@@ -41,7 +41,6 @@ const ViewerView = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
   const [hasRemoteAudio, setHasRemoteAudio] = useState(false);
-  const [showShareQR, setShowShareQR] = useState(false);
   const [displayName, setDisplayName] = useState("Viewer");
   const [hasAccount, setHasAccount] = useState(false);
   const [resolvedRoomName, setResolvedRoomName] = useState<string | null>(null);
@@ -60,7 +59,6 @@ const ViewerView = () => {
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
   const countdownRef = useRef<number | null>(null);
-  const VIEWER_RECORD_DURATION = 5 * 60;
 
   const [cameraHealth, setCameraHealth] = useState<{
     status: string;
@@ -127,7 +125,7 @@ const ViewerView = () => {
     let cancelled = false;
 
     const loadHealth = async () => {
-      const { data } = await (supabase as any).rpc("get_camera_health", { _room_id: resolvedRoomId });
+      const { data } = await supabase.rpc("get_camera_health", { _room_id: resolvedRoomId });
       if (!cancelled && Array.isArray(data) && data[0]) {
         setCameraHealth(data[0]);
       }
@@ -211,7 +209,13 @@ const ViewerView = () => {
     const videoEl = videoRef.current;
     let stream: MediaStream | null = null;
     if (videoEl.srcObject instanceof MediaStream) stream = videoEl.srcObject;
-    else if ((videoEl as any).captureStream) stream = (videoEl as any).captureStream();
+    else {
+      // captureStream is not included in every TypeScript DOM lib target.
+      const captureVideo = videoEl as HTMLVideoElement & { captureStream?: () => MediaStream };
+      if (typeof captureVideo.captureStream === "function") {
+        stream = captureVideo.captureStream.call(videoEl);
+      }
+    }
 
     if (audioRef.current?.srcObject instanceof MediaStream) {
       const audioTracks = (audioRef.current.srcObject as MediaStream).getAudioTracks();
@@ -290,12 +294,9 @@ const ViewerView = () => {
   const isConnected = connectionState === ConnectionState.Connected;
   const isReconnecting = connectionState === ConnectionState.Reconnecting;
   const friendlyName = resolvedRoomName ? friendlyRoomName(resolvedRoomName) : "Private Camera";
-  const privateViewerKey = resolvedRoomId || roomName || "";
-  const viewerUrl = viewerLink(privateViewerKey);
 
   return (
     <div ref={containerRef} className="flex min-h-[100dvh] select-none flex-col bg-black text-white">
-      <ShareSheet open={showShareQR} onOpenChange={setShowShareQR} url={viewerUrl} title={friendlyName} roomName={resolvedRoomName || undefined} />
       {motionAlert && (
         <div className="pointer-events-none fixed inset-0 z-50 flex items-start justify-center pt-20">
           <div className="pointer-events-auto flex animate-bounce items-center gap-3 rounded-2xl bg-orange-500/95 px-6 py-4 shadow-2xl shadow-orange-500/40">
@@ -427,10 +428,7 @@ const ViewerView = () => {
             <TalkbackButton room={room} isConnected={isConnected} />
             <NightVisionToggle videoRef={videoRef} />
             <LullabyPlayer room={room} isConnected={isConnected} />
-            <button onClick={() => setShowShareQR(true)} className="touch-target flex flex-col items-center gap-1.5">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/80"><Share2 className="h-5 w-5" /></div>
-              <span className="text-[10px] opacity-60">Share</span>
-            </button>
+
             <button onClick={toggleFullscreen} className="touch-target flex flex-col items-center gap-1.5">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15">
                 {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}

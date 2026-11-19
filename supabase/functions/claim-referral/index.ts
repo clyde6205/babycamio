@@ -18,9 +18,12 @@ Deno.serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
     if (!user) return json({ error: "Invalid token" }, 401);
 
-    let body: any = {};
-    try { body = await req.json(); } catch { /* empty */ }
-    const code = String(body.code || "").trim().toUpperCase();
+    let body: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = await req.json();
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) body = parsed as Record<string, unknown>;
+    } catch { /* optional body was not valid JSON */ }
+    const code = String(body.code ?? "").trim().toUpperCase();
     if (!/^[A-Z0-9-]{4,32}$/.test(code)) return json({ error: "Invalid code" }, 400);
 
     if (Date.now() - new Date(user.created_at).getTime() > MAX_ACCOUNT_AGE_MS)

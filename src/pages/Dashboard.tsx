@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,17 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Activity, Baby, BatteryCharging, Bot, Camera, Cctv, Check, Copy, Crosshair, Crown,
+  Activity, Baby, BatteryCharging, Bot, Camera, Cctv, Crosshair, Crown,
   Download, Eye, Film, Gift, Heart, Loader2, LogOut, Moon, Plus, Ruler, Settings,
-  Share2, Shield, Smartphone, Star, Trash2, UserPlus, Video,
+  Shield, Smartphone, Star, Trash2, UserPlus, Video,
 } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useToast } from "@/hooks/use-toast";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import ShareDialog from "@/components/ShareDialog";
-import ShareSheet from "@/components/ShareSheet";
-import { viewerLink } from "@/lib/share";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import MultiCameraGrid from "@/components/MultiCameraGrid";
 import OnboardingWizard from "@/components/OnboardingWizard";
@@ -42,12 +40,11 @@ const Dashboard = () => {
   const { user, loading: authLoading } = useAutoAuth();
   const { config } = useAppSettings();
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [sharedRooms, setSharedRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
-  const [shareRoom, setShareRoom] = useState<Room | null>(null);
   const [creating, setCreating] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [joinCode, setJoinCode] = useState("");
@@ -70,25 +67,32 @@ const Dashboard = () => {
     if (!localStorage.getItem("babycam_onboarded")) setShowOnboarding(true);
   }, []);
 
-  const fetchRooms = async () => {
+  const fetchRooms = useCallback(async () => {
     if (!user) {
       setRooms([]);
+      setSharedRooms([]);
       setLoading(false);
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
-      .from("rooms")
-      .select("id, room_name, is_active, room_type, created_at")
-      .eq("owner_id", user.id)
-      .order("created_at", { ascending: false });
-    if (error) {
-      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
-    } else if (data) {
-      setRooms(data as Room[]);
+    const [ownedResult, sharedResult] = await Promise.all([
+      supabase.from("rooms")
+        .select("id, room_name, is_active, room_type, created_at")
+        .eq("owner_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase.from("rooms")
+        .select("id, room_name, is_active, room_type, created_at")
+        .neq("owner_id", user.id)
+        .order("created_at", { ascending: false }),
+    ]);
+    if (ownedResult.error) {
+      toast({ title: t("common.error"), description: ownedResult.error.message, variant: "destructive" });
+    } else {
+      setRooms((ownedResult.data || []) as Room[]);
+      setSharedRooms((sharedResult.data || []) as Room[]);
     }
     setLoading(false);
-  };
+  }, [user, toast, t]);
 
   useEffect(() => {
     const load = async () => {
@@ -104,7 +108,7 @@ const Dashboard = () => {
       await fetchRooms();
     };
     if (!authLoading) void load();
-  }, [user, authLoading]);
+  }, [user, authLoading, fetchRooms]);
 
   const createRoom = async () => {
     const label = newRoomName.trim().replace(/\s+/g, " ");
@@ -162,12 +166,7 @@ const Dashboard = () => {
     toast({ title: t("dashboard.roomDeleted") });
   };
 
-  const copyRoomLink = async (room: Room) => {
-    await navigator.clipboard.writeText(viewerLink(room.id));
-    setCopiedId(room.id);
-    setTimeout(() => setCopiedId(null), 2000);
-    toast({ title: "Secure viewer link copied", description: "Send this private link only to people you trust." });
-  };
+
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -175,9 +174,23 @@ const Dashboard = () => {
   };
 
   const handleJoinRoom = () => {
-    const code = joinCode.trim();
-    if (!code) return;
-    navigate(`/viewer/${encodeURIComponent(code)}`);
+    const value = joinCode.trim();
+    if (!value) return;
+    let roomKey = value;
+    try {
+      const parsed = new URL(value);
+      if (parsed.origin !== "https://babycam.io" && parsed.origin !== "https://www.babycam.io") return;
+      const match = parsed.pathname.match(/^\/viewer\/([^/]+)\/?$/);
+      if (!match) return;
+      roomKey = decodeURIComponent(match[1]);
+    } catch {
+      // A bare room UUID is also accepted; access codes are not valid viewer credentials.
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(roomKey)) {
+      toast({ title: "Invalid viewer link", description: "Paste the full private viewer link or room UUID.", variant: "destructive" });
+      return;
+    }
+    navigate(`/viewer/${encodeURIComponent(roomKey)}`);
   };
 
   if (authLoading) {
@@ -265,12 +278,12 @@ const Dashboard = () => {
 
         {showJoin && (
           <Card className="mb-6 p-4">
-            <p className="mb-2 text-sm text-muted-foreground">Paste the private viewer code or link sent by the camera owner:</p>
+            <p className="mb-2 text-sm text-muted-foreground">Paste the private viewer link or room UUID sent by the camera owner:</p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}
-                placeholder="Private viewer code"
+                placeholder="Private viewer link or room UUID"
                 className="touch-target"
                 onKeyDown={(e) => e.key === "Enter" && handleJoinRoom()}
               />
@@ -294,7 +307,7 @@ const Dashboard = () => {
 
         {loading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-        ) : rooms.length === 0 ? (
+        ) : rooms.length === 0 && sharedRooms.length === 0 ? (
           <div className="rounded-xl border-2 border-dashed p-8 text-center sm:p-12">
             <Eye className="mx-auto mb-3 h-12 w-12 text-primary/40" />
             <h3 className="mb-1 text-lg font-semibold">Welcome to BabyCam.io</h3>
@@ -314,18 +327,12 @@ const Dashboard = () => {
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <ShareDialog roomId={room.id} roomName={room.room_name} userId={user.id} />
-                    <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => copyRoomLink(room)} aria-label="Copy viewer link">
-                      {copiedId === room.id ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                    </Button>
                     <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive" onClick={() => deleteRoom(room.id)} aria-label="Delete room">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Button size="lg" className="touch-target w-full bg-success text-base font-bold text-success-foreground hover:bg-success/90" onClick={() => setShareRoom(room)}>
-                    <Share2 className="mr-2 h-5 w-5" /> Share Camera — QR & WhatsApp
-                  </Button>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Button size="sm" className="touch-target" onClick={() => navigate(`/camera/${room.room_name}`)}>
                       <Camera className="mr-1 h-4 w-4" /> {t("dashboard.startCamera")}
@@ -338,6 +345,26 @@ const Dashboard = () => {
               </Card>
             ))}
           </div>
+        )}
+
+        {sharedRooms.length > 0 && (
+          <section className="mt-8 space-y-3" aria-labelledby="shared-rooms-heading">
+            <div>
+              <h2 id="shared-rooms-heading" className="text-lg font-bold">Shared with me</h2>
+              <p className="text-xs text-muted-foreground">Cameras other owners have shared with your account.</p>
+            </div>
+            {sharedRooms.map((room) => (
+              <Card key={room.id} className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <h3 className="truncate font-semibold capitalize">{roomDisplayName(room.room_name)}</h3>
+                  <p className="text-xs text-muted-foreground">{room.is_active ? "Live" : "Offline"} · Shared camera</p>
+                </div>
+                <Button className="touch-target shrink-0" onClick={() => navigate(`/viewer/${room.id}`)}>
+                  <Eye className="mr-1 h-4 w-4" /> Watch
+                </Button>
+              </Card>
+            ))}
+          </section>
         )}
 
         <MultiCameraGrid rooms={rooms} />
@@ -398,15 +425,6 @@ const Dashboard = () => {
       </main>
 
       <AdBanner />
-      {shareRoom && (
-        <ShareSheet
-          open={Boolean(shareRoom)}
-          onOpenChange={(open) => !open && setShareRoom(null)}
-          url={viewerLink(shareRoom.id)}
-          title={roomDisplayName(shareRoom.room_name)}
-          roomName={shareRoom.room_name}
-        />
-      )}
       <CopyrightFooter variant="dark" showLinks={false} />
     </div>
   );

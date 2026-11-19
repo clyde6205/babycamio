@@ -67,8 +67,9 @@ Required for BitPay:
 
 ```bash
 BITPAY_API_TOKEN=...
-BITPAY_WEBHOOK_SECRET=...
 ```
+
+The BitPay webhook treats IPNs only as notifications and retrieves the invoice from BitPay's API with this token before processing payment status. Do not trust IPN payload fields as payment evidence.
 
 Optional checkout origin controls:
 
@@ -108,9 +109,9 @@ Build and sign the Android app from Android Studio. Do not commit keystores, `lo
 
 ## Security notes
 
-- Viewer links use room UUIDs, not guessable room slugs.
+- Anonymous viewer links use random per-invitation UUID tokens stored in `shared_access`; revoking a grant blocks new token issuance. Room primary keys are not anonymous share credentials.
 - Publishing requires an authenticated room owner.
-- Viewer tokens can subscribe, send data, and publish microphone audio for talkback, but cannot publish camera/screen sources.
+- Viewer tokens can subscribe and publish microphone audio for talkback, but cannot publish camera, screen, or LiveKit data packets.
 - Stripe, PayMongo, and BitPay webhook handlers reject unsigned or unconfigured requests.
 - Checkout success/cancel URLs are restricted to an origin allow-list.
 - Supabase service-role keys belong only in edge-function secrets.

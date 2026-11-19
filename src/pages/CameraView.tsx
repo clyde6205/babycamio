@@ -58,6 +58,8 @@ const CameraView = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showShareQR, setShowShareQR] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
+  const [viewerAccessToken, setViewerAccessToken] = useState<string | null>(null);
+  const shareLinkPromiseRef = useRef<Promise<string | null> | null>(null);
   const [roomLookupError, setRoomLookupError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTimeLeft, setRecordingTimeLeft] = useState(0);
@@ -341,20 +343,54 @@ const CameraView = () => {
     };
   }, [room, connectionState]);
 
+  const createViewerLink = useCallback(async (): Promise<string | null> => {
+    if (viewerAccessToken) return viewerAccessToken;
+    if (shareLinkPromiseRef.current) return shareLinkPromiseRef.current;
+    if (!roomId || !userId) return null;
+
+    const task = (async () => {
+      const token = crypto.randomUUID();
+      const { error } = await supabase.from("shared_access").insert({
+        room_id: roomId,
+        granted_by: userId,
+        shared_with_email: "link-access@babycam.io",
+        access_code: token,
+        is_active: true,
+      });
+      if (error) {
+        console.error("[CameraShare] Could not create private viewer link:", error.message);
+        toast({ title: "Could not create viewer link", description: error.message, variant: "destructive" });
+        return null;
+      }
+      setViewerAccessToken(token);
+      return token;
+    })();
+
+    shareLinkPromiseRef.current = task;
+    try {
+      return await task;
+    } finally {
+      shareLinkPromiseRef.current = null;
+    }
+  }, [viewerAccessToken, roomId, userId, toast]);
+
+
   const sharedOnceRef = useRef(false);
   useEffect(() => {
     if (connectionState === ConnectionState.Connected) {
       setElapsedTime(0);
       timerRef.current = window.setInterval(() => setElapsedTime((time) => time + 1), 1000);
-      if (!sharedOnceRef.current && roomId) {
+      if (!sharedOnceRef.current && roomId && userId) {
         sharedOnceRef.current = true;
-        setTimeout(() => setShowShareQR(true), 1500);
+        void createViewerLink().then((token) => {
+          if (token) setShowShareQR(true);
+        });
       }
     } else if (timerRef.current) {
       clearInterval(timerRef.current);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [connectionState, roomId]);
+  }, [connectionState, roomId, userId, createViewerLink]);
 
   useEffect(() => {
     if (!userId || !roomName) return;
@@ -392,18 +428,20 @@ const CameraView = () => {
     return `${hours > 0 ? `${hours}:` : ""}${minutes.toString().padStart(2, "0")}:${remainder.toString().padStart(2, "0")}`;
   };
 
-  const openShare = () => {
-    if (!roomId) {
+
+  const openShare = async () => {
+    if (!roomId || !userId) {
       toast({ title: "Camera not ready", description: roomLookupError || "The private viewer link is still being prepared.", variant: "destructive" });
       return;
     }
-    setShowShareQR(true);
+    const token = await createViewerLink();
+    if (token) setShowShareQR(true);
   };
 
   const isConnected = connectionState === ConnectionState.Connected;
   const isReconnecting = connectionState === ConnectionState.Reconnecting;
   const friendlyName = friendlyRoomName(roomName || "Room");
-  const viewerUrl = roomId ? viewerLink(roomId) : "";
+  const viewerUrl = viewerAccessToken ? viewerLink(viewerAccessToken) : "";
 
   if (authLoading) {
     return <div className="flex min-h-dvh items-center justify-center bg-black"><Loader2 className="h-8 w-8 animate-spin text-white" /></div>;
@@ -411,7 +449,7 @@ const CameraView = () => {
 
   return (
     <div className="flex min-h-[100dvh] select-none flex-col bg-black text-white">
-      {roomId && <ShareSheet open={showShareQR} onOpenChange={setShowShareQR} url={viewerUrl} title={friendlyName} roomName={roomName} />}
+      {viewerUrl && <ShareSheet open={showShareQR} onOpenChange={setShowShareQR} url={viewerUrl} title={friendlyName} roomName={roomName} />}
       <header className="relative z-10 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent px-4 py-3">
         <button onClick={handleDisconnect} className="touch-target flex items-center gap-2" aria-label="End camera"><ArrowLeft className="h-5 w-5" /></button>
         <div className="flex items-center gap-3">

@@ -85,6 +85,23 @@ serve(async (req) => {
       return json({ error: "Invalid plan or billing interval" }, 400);
     }
 
+    const { data: currentSubscription, error: subscriptionLookupError } = await supabase
+      .from("subscriptions")
+      .select("plan, status, current_period_end")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (subscriptionLookupError) throw subscriptionLookupError;
+    const currentPeriodEnd = currentSubscription?.current_period_end
+      ? new Date(currentSubscription.current_period_end).getTime()
+      : 0;
+    if (
+      currentSubscription?.plan === "pro" &&
+      ["active", "trialing"].includes(currentSubscription.status) &&
+      (!currentPeriodEnd || currentPeriodEnd > Date.now())
+    ) {
+      return json({ error: "An active Pro subscription already exists. Manage it from your account instead." }, 409);
+    }
+
     const price = PLAN_PRICES[plan][billing];
     const origin = getCheckoutOrigin(req);
 
@@ -101,6 +118,7 @@ serve(async (req) => {
         transactionSpeed: "medium",
         paymentCurrencies: ["XRP"],
         notificationURL: `${supabaseUrl}/functions/v1/bitpay-webhook`,
+        extendedNotifications: true,
         redirectURL: `${origin}/dashboard?payment=success&provider=bitpay`,
         closeURL: `${origin}/pricing?payment=canceled`,
         buyer: { email: userEmail },
@@ -121,7 +139,7 @@ serve(async (req) => {
     const invoiceId = invoiceData.data?.id || invoiceData.id;
     if (!invoiceUrl || !invoiceId) throw new Error("BitPay did not return an invoice URL");
 
-    await supabase.from("payments").insert({
+    const { error: paymentInsertError } = await supabase.from("payments").insert({
       user_id: userId,
       amount_cents: Math.round(price * 100),
       currency: "USD",
@@ -130,6 +148,22 @@ serve(async (req) => {
       status: "pending",
       metadata: { plan, billing, invoice_id: invoiceId, payment_currency: "XRP" },
     });
+    if (paymentInsertError?.code === "23505") {
+      // A very fast BitPay IPN may have inserted the verified invoice first.
+      const { data: existingPayment, error: existingPaymentError } = await supabase
+        .from("payments")
+        .select("user_id")
+        .eq("payment_provider", "bitpay")
+        .eq("provider_payment_id", invoiceId)
+        .maybeSingle();
+      if (existingPaymentError || existingPayment?.user_id !== userId) {
+        console.error("[BitPayCheckout] Duplicate invoice payment could not be reconciled:", existingPaymentError);
+        return json({ error: "Unable to safely reconcile this checkout. Please contact support." }, 500);
+      }
+    } else if (paymentInsertError) {
+      console.error("[BitPayCheckout] Failed to record pending payment:", paymentInsertError);
+      return json({ error: "Unable to record checkout. Please contact support before retrying." }, 500);
+    }
 
     return json({ url: invoiceUrl, provider: "bitpay", invoiceId });
   } catch (err: unknown) {

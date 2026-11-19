@@ -22,10 +22,6 @@ interface ProviderConfig {
 
 const PROVIDERS: ProviderConfig[] = [
   { id: "twilio", name: "Twilio SMS", icon: "📱", description: "Send & receive SMS worldwide", keys: [{ name: "account_sid", label: "Account SID", placeholder: "AC..." }, { name: "auth_token", label: "Auth Token", placeholder: "Your auth token" }, { name: "phone_number", label: "Twilio Phone Number", placeholder: "+1234567890" }] },
-  { id: "stripe", name: "Stripe", icon: "💳", description: "Credit/Debit cards — Global", keys: [{ name: "secret_key", label: "Secret Key", placeholder: "sk_live_..." }, { name: "webhook_secret", label: "Webhook Secret", placeholder: "whsec_..." }] },
-  { id: "paypal", name: "PayPal", icon: "🅿️", description: "PayPal payments — Global", keys: [{ name: "client_id", label: "Client ID", placeholder: "AX..." }, { name: "secret", label: "Secret", placeholder: "EL..." }] },
-  { id: "paymongo", name: "PayMongo (GCash/Maya)", icon: "🇵🇭", description: "GCash & Maya — Philippines", keys: [{ name: "secret_key", label: "Secret Key", placeholder: "sk_live_..." }, { name: "webhook_secret", label: "Webhook Secret (optional)", placeholder: "whsec_..." }] },
-  { id: "mpesa", name: "M-Pesa", icon: "🇰🇪", description: "Mobile Money — Kenya, Tanzania, Africa", keys: [{ name: "consumer_key", label: "Consumer Key", placeholder: "Consumer key from Daraja" }, { name: "consumer_secret", label: "Consumer Secret", placeholder: "Consumer secret from Daraja" }, { name: "shortcode", label: "Business Shortcode", placeholder: "174379" }, { name: "passkey", label: "Passkey", placeholder: "Lipa na M-Pesa passkey" }] },
 ];
 
 const Settings = () => {
@@ -63,11 +59,15 @@ const Settings = () => {
       .eq("setting_key", "motion_recording")
       .single();
 
-    const global = globalSettings?.setting_value as any;
-    if (global) {
-      setMaxDuration(global.max_duration_minutes || 60);
-      setMotionSensitivity(global.motion_sensitivity || 25);
-      setRecordingDuration(global.default_duration_minutes || 5);
+    const globalValue = globalSettings?.setting_value;
+    if (globalValue && typeof globalValue === "object" && !Array.isArray(globalValue)) {
+      const global = globalValue as Record<string, unknown>;
+      const maxDuration = Number(global.max_duration_minutes);
+      const sensitivity = Number(global.motion_sensitivity);
+      const defaultDuration = Number(global.default_duration_minutes);
+      setMaxDuration(Number.isFinite(maxDuration) && maxDuration > 0 ? maxDuration : 60);
+      setMotionSensitivity(Number.isFinite(sensitivity) && sensitivity > 0 ? sensitivity : 25);
+      setRecordingDuration(Number.isFinite(defaultDuration) && defaultDuration > 0 ? defaultDuration : 5);
     }
 
     // Load user overrides
@@ -100,8 +100,8 @@ const Settings = () => {
         }, { onConflict: "user_id" });
       if (error) throw error;
       toast({ title: "Camera settings saved", description: `Recording: ${clampedDuration} min, Motion: ${motionEnabled ? "On" : "Off"}` });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Unexpected settings error", variant: "destructive" });
     } finally { setSavingCamera(false); }
   };
 
@@ -111,7 +111,7 @@ const Settings = () => {
     if (data) {
       const grouped: Record<string, Record<string, string>> = {};
       const configured = new Set<string>();
-      data.forEach((row: any) => {
+      data.forEach((row) => {
         if (!grouped[row.provider]) grouped[row.provider] = {};
         grouped[row.provider][row.key_name] = row.key_value;
         configured.add(row.provider);
@@ -145,8 +145,8 @@ const Settings = () => {
       }
       setSavedProviders((prev) => new Set([...prev, provider.id]));
       toast({ title: `${provider.name} configured`, description: t("settings.keysSaved") });
-    } catch (err: any) {
-      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: t("common.error"), description: err instanceof Error ? err.message : String(err), variant: "destructive" });
     } finally { setSaving(null); }
   };
 
@@ -159,8 +159,8 @@ const Settings = () => {
       setKeyValues((prev) => { const next = { ...prev }; delete next[providerId]; return next; });
       setSavedProviders((prev) => { const next = new Set(prev); next.delete(providerId); return next; });
       toast({ title: t("settings.providerRemoved") });
-    } catch (err: any) {
-      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: t("common.error"), description: err instanceof Error ? err.message : String(err), variant: "destructive" });
     } finally { setSaving(null); }
   };
 
@@ -261,6 +261,7 @@ const Settings = () => {
             <h1 className="text-2xl font-bold">{t("settings.paymentProviders")}</h1>
           </div>
           <p className="text-sm text-muted-foreground">{t("settings.desc")}</p>
+          <p className="mt-2 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">Payment processing is managed by BabyCam.io. Stripe, PayMongo, PayPal, M-Pesa, and BitPay credentials must be configured as secure deployment secrets by the platform operator; personal settings keys do not activate checkout.</p>
         </div>
 
         <div className="space-y-4">

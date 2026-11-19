@@ -78,6 +78,24 @@ serve(async (req) => {
     if (!["monthly", "annual"].includes(billing)) return json({ error: "Invalid billing interval" }, 400);
 
     const priceAmount = PLAN_PRICES[plan][billing];
+    if (provider === "stripe") {
+      const { data: currentSubscription, error: subscriptionLookupError } = await supabase
+        .from("subscriptions")
+        .select("plan, status, current_period_end")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (subscriptionLookupError) throw subscriptionLookupError;
+      const periodEnd = currentSubscription?.current_period_end
+        ? new Date(currentSubscription.current_period_end).getTime()
+        : 0;
+      if (
+        currentSubscription?.plan === "pro" &&
+        ["active", "trialing"].includes(currentSubscription.status) &&
+        (!periodEnd || periodEnd > Date.now())
+      ) {
+        return json({ error: "An active Pro subscription already exists. Manage it from your account instead." }, 409);
+      }
+    }
     const interval = billing === "annual" ? "year" : "month";
     const priceLabel = billing === "annual" ? "$99.00/year" : "$10.97/month";
     const origin = getCheckoutOrigin(req);
@@ -104,6 +122,9 @@ serve(async (req) => {
             "metadata[user_id]": user.id,
             "metadata[plan]": plan,
             "metadata[billing]": billing,
+            "subscription_data[metadata][user_id]": user.id,
+            "subscription_data[metadata][plan]": plan,
+            "subscription_data[metadata][billing]": billing,
             "line_items[0][price_data][currency]": "usd",
             "line_items[0][price_data][unit_amount]": priceAmount.toString(),
             "line_items[0][price_data][recurring][interval]": interval,
@@ -128,43 +149,10 @@ serve(async (req) => {
       }
 
       case "paymongo": {
-        const paymongoKey = Deno.env.get("PAYMONGO_SECRET_KEY");
-        const phpAmount = configuredPhpCentavos(billing);
-        if (!paymongoKey || !phpAmount) {
-          return json({
-            error: "PayMongo not configured",
-            message: "PayMongo PHP pricing and webhook configuration are required before checkout is enabled.",
-          }, 503);
-        }
-
-        const pmRes = await fetch("https://api.paymongo.com/v1/checkout_sessions", {
-          method: "POST",
-          headers: {
-            Authorization: `Basic ${btoa(paymongoKey + ":")}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            data: {
-              attributes: {
-                line_items: [{
-                  name: `BabyCam Pro ${billing === "annual" ? "Annual" : "Monthly"}`,
-                  amount: phpAmount,
-                  currency: "PHP",
-                  quantity: 1,
-                }],
-                payment_method_types: ["gcash", "paymaya"],
-                success_url: `${origin}/dashboard?payment=success`,
-                cancel_url: `${origin}/pricing?payment=canceled`,
-                metadata: { user_id: user.id, plan, billing },
-              },
-            },
-          }),
-        });
-
-        const pmSession = await pmRes.json();
-        if (pmSession.errors) throw new Error(pmSession.errors[0]?.detail || "PayMongo error");
-        return json({ url: pmSession.data.attributes.checkout_url, provider: "paymongo" });
+        return json({
+          error: "PayMongo checkout unavailable",
+          message: "PayMongo remains disabled until its full payment and subscription renewal flow has passed staging verification.",
+        }, 503);
       }
 
       case "mpesa": {

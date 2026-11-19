@@ -84,8 +84,8 @@ const EmailInvite = ({ roomName }: { roomName: string }) => {
         if (!resend) setEmail("");
       }
       await load();
-    } catch (e: any) {
-      toast({ title: "Couldn't send the invitation", description: e?.message, variant: "destructive" });
+    } catch (e: unknown) {
+      toast({ title: "Couldn't send the invitation", description: e instanceof Error ? e.message : "Unexpected invitation error", variant: "destructive" });
     } finally {
       setSending(false);
       setResendingId(null);

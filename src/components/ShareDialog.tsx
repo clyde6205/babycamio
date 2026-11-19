@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import { Check, Copy, Loader2, Share2, Trash2, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import SmsSender from "@/components/SmsSender";
 import { viewerLink } from "@/lib/share";
 
 interface SharedUser {
@@ -39,19 +38,22 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
   const [sharing, setSharing] = useState(false);
   const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([]);
   const [loading, setLoading] = useState(false);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const friendlyName = roomName.replace(/-[a-z0-9]+$/i, "").replace(/-/g, " ") || roomName;
-  const secureViewerLink = viewerLink(roomId);
 
   const loadSharedUsers = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("shared_access")
-      .select("*")
+      .select("id, shared_with_email, access_code, is_active, created_at")
       .eq("room_id", roomId)
       .eq("granted_by", userId)
       .order("created_at", { ascending: false });
-    if (data) setSharedUsers(data as SharedUser[]);
+    if (error) {
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
+    } else {
+      setSharedUsers((data || []) as SharedUser[]);
+    }
     setLoading(false);
   };
 
@@ -62,46 +64,60 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
 
   const shareRoom = async () => {
     const to = email.trim().toLowerCase();
-    if (!to) return;
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      toast({ title: "Valid email required", description: "Enter the viewer's email address.", variant: "destructive" });
+      return;
+    }
     setSharing(true);
-
     try {
-      const code = crypto.randomUUID().slice(0, 8).toUpperCase();
+      const shareToken = crypto.randomUUID();
+      const privateLink = viewerLink(shareToken);
       const { error } = await supabase.from("shared_access").insert({
         room_id: roomId,
         granted_by: userId,
         shared_with_email: to,
-        access_code: code,
+        access_code: shareToken,
       });
       if (error) throw error;
 
       const mail = document.createElement("a");
-      mail.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(`Watch "${friendlyName}" live on BabyCam.io`)}&body=${encodeURIComponent(`Hi!\n\nYou've been invited to watch my baby camera "${friendlyName}" live.\n\nOpen this private link (no download or account needed):\n${secureViewerLink}\n\nKeep this link private.\n\nSent with BabyCam.io`)}`;
+      mail.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(`Watch "${friendlyName}" live on BabyCam.io`)}&body=${encodeURIComponent(`Hi!\n\nYou've been invited to watch my baby camera "${friendlyName}" live.\n\nOpen this private link (no download or account needed):\n${privateLink}\n\nKeep this link private.\n\nSent with BabyCam.io`)}`;
       document.body.appendChild(mail);
       mail.click();
       mail.remove();
       setEmail("");
       await loadSharedUsers();
-      toast({ title: t("share.accessShared"), description: `A private viewer link was prepared for ${to}.` });
-    } catch (err: any) {
-      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
+      toast({ title: t("share.accessShared"), description: `A revocable private viewer link was prepared for ${to}.` });
+    } catch (err: unknown) {
+      toast({ title: t("common.error"), description: err instanceof Error ? err.message : "Unexpected sharing error", variant: "destructive" });
     } finally {
       setSharing(false);
     }
   };
 
   const revokeAccess = async (id: string) => {
-    const { error } = await supabase.from("shared_access").update({ is_active: false }).eq("id", id);
-    if (!error) {
-      setSharedUsers((prev) => prev.map((u) => (u.id === id ? { ...u, is_active: false } : u)));
-      toast({ title: t("share.accessRevoked") });
+    const { error } = await supabase
+      .from("shared_access")
+      .update({ is_active: false })
+      .eq("id", id)
+      .eq("granted_by", userId)
+      .eq("room_id", roomId);
+    if (error) {
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
+      return;
     }
+    setSharedUsers((prev) => prev.map((viewer) => viewer.id === id ? { ...viewer, is_active: false } : viewer));
+    toast({ title: t("share.accessRevoked"), description: "New viewing sessions using this link are blocked." });
   };
 
-  const copyCode = async (code: string) => {
-    await navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
+  const copyViewerLink = async (viewer: SharedUser) => {
+    try {
+      await navigator.clipboard.writeText(viewerLink(viewer.access_code));
+      setCopiedLink(viewer.id);
+      window.setTimeout(() => setCopiedLink(null), 2000);
+    } catch {
+      toast({ title: t("common.error"), description: "Clipboard access is unavailable on this device.", variant: "destructive" });
+    }
   };
 
   return (
@@ -121,7 +137,13 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
           <div className="space-y-2">
             <Label>{t("share.inviteViewer")}</Label>
             <div className="flex gap-2">
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("share.emailPlaceholder")} onKeyDown={(e) => e.key === "Enter" && shareRoom()} />
+              <Input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder={t("share.emailPlaceholder")}
+                onKeyDown={(event) => event.key === "Enter" && void shareRoom()}
+              />
               <Button onClick={shareRoom} disabled={sharing} size="sm" className="h-11 w-11">
                 {sharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
               </Button>
@@ -130,29 +152,34 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
 
           <div className="space-y-2">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-              {t("share.sharedWith", { count: sharedUsers.filter((u) => u.is_active).length })}
+              {t("share.sharedWith", { count: sharedUsers.filter((viewer) => viewer.is_active).length })}
             </Label>
             {loading ? (
-              <div className="py-4 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></div>
+              <div className="py-4 text-center">
+                <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
             ) : sharedUsers.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground">{t("share.noViewers")}</p>
             ) : (
-              <div className="max-h-48 space-y-2 overflow-y-auto">
-                {sharedUsers.map((sharedUser) => (
-                  <div key={sharedUser.id} className={`flex items-center justify-between rounded-lg border p-2.5 text-sm ${!sharedUser.is_active ? "opacity-50" : ""}`}>
+              <div className="max-h-56 space-y-2 overflow-y-auto">
+                {sharedUsers.map((viewer) => (
+                  <div key={viewer.id} className={`flex items-center justify-between gap-2 rounded-lg border p-2.5 text-sm ${!viewer.is_active ? "opacity-50" : ""}`}>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{sharedUser.shared_with_email}</p>
-                      <div className="flex items-center gap-1.5">
-                        <code className="text-xs text-muted-foreground">{sharedUser.access_code}</code>
-                        <button onClick={() => copyCode(sharedUser.access_code)} className="flex h-8 w-8 items-center justify-center" aria-label="Copy access code">
-                          {copiedCode === sharedUser.access_code ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-                        </button>
-                      </div>
+                      <p className="truncate font-medium">{viewer.shared_with_email === "link-access@babycam.io" ? "Anyone with this link" : viewer.shared_with_email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {viewer.is_active ? "Private link active" : "Access revoked"}
+                      </p>
                     </div>
-                    {sharedUser.is_active ? (
-                      <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive" onClick={() => revokeAccess(sharedUser.id)} aria-label="Revoke access">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                    {viewer.is_active ? (
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => void copyViewerLink(viewer)}>
+                          {copiedLink === viewer.id ? <Check className="mr-1 h-3 w-3" /> : <Copy className="mr-1 h-3 w-3" />}
+                          Copy link
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive" onClick={() => void revokeAccess(viewer.id)} aria-label="Revoke access">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">{t("share.revoked")}</span>
                     )}
@@ -160,26 +187,6 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
                 ))}
               </div>
             )}
-          </div>
-
-          <SmsSender defaultMessage={`Watch my baby camera "${friendlyName}" live now with this private link: ${secureViewerLink}`} />
-
-          {typeof navigator.share === "function" && (
-            <Button variant="secondary" className="w-full" onClick={() => {
-              void navigator.share({
-                title: `BabyCam - ${friendlyName}`,
-                text: `Watch my baby camera "${friendlyName}" live with this private link:`,
-                url: secureViewerLink,
-              }).catch(() => {});
-            }}>
-              <Share2 className="mr-2 h-4 w-4" /> Share via Apps
-            </Button>
-          )}
-
-          <div className="rounded-lg bg-muted/50 p-3">
-            <p className="break-all text-xs text-muted-foreground">
-              Private viewer link: <code className="text-foreground">{secureViewerLink}</code>
-            </p>
           </div>
         </div>
       </DialogContent>
