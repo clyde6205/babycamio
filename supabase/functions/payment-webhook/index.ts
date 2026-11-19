@@ -203,16 +203,105 @@ serve(async (req) => {
           }, { onConflict: "user_id" });
           if (subscriptionError) throw subscriptionError;
 
-          const { error: paymentError } = await supabase.from("payments").insert({
-            user_id: userId,
-            amount_cents: session.amount_total,
-            currency: session.currency.toUpperCase(),
-            payment_provider: "stripe",
-            provider_payment_id: session.id,
-            status: "succeeded",
-            metadata: { stripe_event_id: event.id, billing, stripe_subscription_id: stripeSubscription.id },
-          });
-          if (paymentError) throw paymentError;
+        }
+
+        if (event.type === "invoice.paid") {
+          const invoice = event.data?.object || {};
+          const subscriptionId = typeof invoice.subscription === "string"
+            ? invoice.subscription
+            : invoice.subscription?.id;
+          if (typeof subscriptionId === "string") {
+            const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+            if (!stripeKey) return json({ error: "Stripe API is not configured" }, 503);
+            const response = await fetch(
+              `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+              { headers: { Authorization: `Bearer ${stripeKey}` } },
+            );
+            if (!response.ok) throw new Error("Unable to verify the renewed Stripe subscription");
+            const stripeSubscription = await response.json();
+            const userId = stripeSubscription.metadata?.user_id;
+            const validUserId = typeof userId === "string" &&
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
+            if (!validUserId || !["active", "trialing"].includes(stripeSubscription.status)) {
+              return json({ error: "Stripe invoice is not attached to an active BabyCam account" }, 400);
+            }
+            const periodStart = new Date(Number(stripeSubscription.current_period_start) * 1000);
+            const periodEnd = new Date(Number(stripeSubscription.current_period_end) * 1000);
+            if (!Number.isFinite(periodStart.getTime()) || !Number.isFinite(periodEnd.getTime()) || periodEnd <= periodStart) {
+              throw new Error("Stripe returned an invalid renewed subscription period");
+            }
+            const { error: subscriptionError } = await supabase.from("subscriptions").upsert({
+              user_id: userId,
+              plan: "pro",
+              status: stripeSubscription.status === "trialing" ? "trialing" : "active",
+              payment_provider: "stripe",
+              provider_subscription_id: stripeSubscription.id,
+              provider_customer_id: stripeSubscription.customer,
+              current_period_start: periodStart.toISOString(),
+              current_period_end: periodEnd.toISOString(),
+              cancel_at_period_end: Boolean(stripeSubscription.cancel_at_period_end),
+            }, { onConflict: "user_id" });
+            if (subscriptionError) throw subscriptionError;
+
+            const amountPaid = Number(invoice.amount_paid || 0);
+            if (amountPaid > 0 && typeof invoice.id === "string") {
+              const { error: paymentError } = await supabase.from("payments").insert({
+                user_id: userId,
+                amount_cents: amountPaid,
+                currency: String(invoice.currency || "usd").toUpperCase(),
+                payment_provider: "stripe",
+                provider_payment_id: invoice.id,
+                status: "succeeded",
+                metadata: { stripe_event_id: event.id, invoice_id: invoice.id, billing_reason: invoice.billing_reason || null },
+              });
+              if (paymentError) throw paymentError;
+            }
+          }
+        }
+
+        if (event.type === "customer.subscription.updated") {
+          const subscription = event.data?.object || {};
+          const { data: existing, error: existingError } = await supabase
+            .from("subscriptions")
+            .select("user_id")
+            .eq("provider_subscription_id", subscription.id)
+            .maybeSingle();
+          if (existingError) throw existingError;
+          const userId = typeof subscription.metadata?.user_id === "string"
+            ? subscription.metadata.user_id
+            : existing?.user_id;
+          if (userId) {
+            const allowedStatuses = ["active", "trialing", "past_due", "canceled", "incomplete"];
+            const status = allowedStatuses.includes(subscription.status) ? subscription.status : "canceled";
+            const periodStart = new Date(Number(subscription.current_period_start) * 1000);
+            const periodEnd = new Date(Number(subscription.current_period_end) * 1000);
+            const { error } = await supabase.from("subscriptions").upsert({
+              user_id: userId,
+              plan: status === "canceled" || status === "incomplete" ? "free" : "pro",
+              status,
+              payment_provider: "stripe",
+              provider_subscription_id: subscription.id,
+              provider_customer_id: subscription.customer,
+              current_period_start: Number.isFinite(periodStart.getTime()) ? periodStart.toISOString() : null,
+              current_period_end: Number.isFinite(periodEnd.getTime()) ? periodEnd.toISOString() : null,
+              cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+            }, { onConflict: "user_id" });
+            if (error) throw error;
+          }
+        }
+
+        if (event.type === "invoice.payment_failed") {
+          const invoice = event.data?.object || {};
+          const subscriptionId = typeof invoice.subscription === "string"
+            ? invoice.subscription
+            : invoice.subscription?.id;
+          if (typeof subscriptionId === "string") {
+            const { error } = await supabase.from("subscriptions").update({
+              plan: "free",
+              status: "past_due",
+            }).eq("provider_subscription_id", subscriptionId);
+            if (error) throw error;
+          }
         }
 
         if (event.type === "customer.subscription.deleted") {
