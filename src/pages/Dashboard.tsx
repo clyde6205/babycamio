@@ -15,8 +15,6 @@ import { useAppSettings } from "@/hooks/use-app-settings";
 import { useToast } from "@/hooks/use-toast";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import ShareDialog from "@/components/ShareDialog";
-import ShareSheet from "@/components/ShareSheet";
-import { viewerLink } from "@/lib/share";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import MultiCameraGrid from "@/components/MultiCameraGrid";
 import OnboardingWizard from "@/components/OnboardingWizard";
@@ -44,11 +42,9 @@ const Dashboard = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [sharedRooms, setSharedRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
-  const [shareRoom, setShareRoom] = useState<Room | null>(null);
   const [creating, setCreating] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [joinCode, setJoinCode] = useState("");
@@ -170,12 +166,7 @@ const Dashboard = () => {
     toast({ title: t("dashboard.roomDeleted") });
   };
 
-  const copyRoomLink = async (room: Room) => {
-    await navigator.clipboard.writeText(viewerLink(room.id));
-    setCopiedId(room.id);
-    setTimeout(() => setCopiedId(null), 2000);
-    toast({ title: "Secure viewer link copied", description: "Send this private link only to people you trust." });
-  };
+
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -336,18 +327,12 @@ const Dashboard = () => {
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <ShareDialog roomId={room.id} roomName={room.room_name} userId={user.id} />
-                    <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => copyRoomLink(room)} aria-label="Copy viewer link">
-                      {copiedId === room.id ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                    </Button>
                     <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive" onClick={() => deleteRoom(room.id)} aria-label="Delete room">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Button size="lg" className="touch-target w-full bg-success text-base font-bold text-success-foreground hover:bg-success/90" onClick={() => setShareRoom(room)}>
-                    <Share2 className="mr-2 h-5 w-5" /> Share Camera — QR & WhatsApp
-                  </Button>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Button size="sm" className="touch-target" onClick={() => navigate(`/camera/${room.room_name}`)}>
                       <Camera className="mr-1 h-4 w-4" /> {t("dashboard.startCamera")}
@@ -440,15 +425,7 @@ const Dashboard = () => {
       </main>
 
       <AdBanner />
-      {shareRoom && (
-        <ShareSheet
-          open={Boolean(shareRoom)}
-          onOpenChange={(open) => !open && setShareRoom(null)}
-          url={viewerLink(shareRoom.id)}
-          title={roomDisplayName(shareRoom.room_name)}
-          roomName={shareRoom.room_name}
-        />
-      )}
+}
       <CopyrightFooter variant="dark" showLinks={false} />
     </div>
   );
