@@ -209,7 +209,13 @@ const ViewerView = () => {
     const videoEl = videoRef.current;
     let stream: MediaStream | null = null;
     if (videoEl.srcObject instanceof MediaStream) stream = videoEl.srcObject;
-    else if (typeof videoEl.captureStream === "function") stream = videoEl.captureStream();
+    else {
+      // captureStream is not included in every TypeScript DOM lib target.
+      const captureVideo = videoEl as HTMLVideoElement & { captureStream?: () => MediaStream };
+      if (typeof captureVideo.captureStream === "function") {
+        stream = captureVideo.captureStream.call(videoEl);
+      }
+    }
 
     if (audioRef.current?.srcObject instanceof MediaStream) {
       const audioTracks = (audioRef.current.srcObject as MediaStream).getAudioTracks();
