@@ -7,12 +7,14 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Gift, Copy, Check, Share2, Users, Crown, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+type ReferralRow = { id: string; referral_code: string; status: string; created_at: string };
+
 const ReferralPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAutoAuth();
   const [referralCode, setReferralCode] = useState("");
-  const [referrals, setReferrals] = useState<any[]>([]);
+  const [referrals, setReferrals] = useState<ReferralRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
@@ -55,7 +57,7 @@ const ReferralPage = () => {
           text: `Try BabyCam.io — turn any phone into a baby monitor. Sign up with my invite and we both get 1 month Pro free!`,
           url: link,
         });
-      } catch {}
+      } catch { /* user cancelled the share sheet */ }
     } else {
       navigator.clipboard.writeText(link);
       toast({ title: "Invite link copied!" });
