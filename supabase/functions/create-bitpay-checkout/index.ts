@@ -85,6 +85,23 @@ serve(async (req) => {
       return json({ error: "Invalid plan or billing interval" }, 400);
     }
 
+    const { data: currentSubscription, error: subscriptionLookupError } = await supabase
+      .from("subscriptions")
+      .select("plan, status, current_period_end")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (subscriptionLookupError) throw subscriptionLookupError;
+    const currentPeriodEnd = currentSubscription?.current_period_end
+      ? new Date(currentSubscription.current_period_end).getTime()
+      : 0;
+    if (
+      currentSubscription?.plan === "pro" &&
+      ["active", "trialing"].includes(currentSubscription.status) &&
+      (!currentPeriodEnd || currentPeriodEnd > Date.now())
+    ) {
+      return json({ error: "An active Pro subscription already exists. Manage it from your account instead." }, 409);
+    }
+
     const price = PLAN_PRICES[plan][billing];
     const origin = getCheckoutOrigin(req);
 
