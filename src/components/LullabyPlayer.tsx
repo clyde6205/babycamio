@@ -122,7 +122,7 @@ const LullabyPlayer = ({ room, isConnected }: LullabyPlayerProps) => {
   const stopSound = () => {
     try {
       sourceRef.current?.stop?.();
-    } catch {}
+    } catch { /* audio source may already be stopped */ }
     sourceRef.current = null;
     audioContextRef.current?.close();
     audioContextRef.current = null;
