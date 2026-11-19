@@ -55,8 +55,13 @@ export async function brandedQrBlob(qrCanvas: HTMLCanvasElement, title: string, 
   context.fillStyle = "#475569";
   context.font = "24px sans-serif";
   context.fillText("Scan with your phone camera to watch live", width / 2, 800);
-  context.font = "20px monospace";
-  context.fillText(url.replace(/^https:\/\//, "").slice(0, 52), width / 2, 845);
+  context.font = "16px monospace";
+  const printableUrl = url.replace(/^https:\/\//, "");
+  const maxCharsPerLine = 68;
+  const urlLines = printableUrl.match(new RegExp(`.{1,${maxCharsPerLine}}`, "g")) || [printableUrl];
+  urlLines.slice(0, 2).forEach((line, index) => {
+    context.fillText(line, width / 2, 840 + index * 22);
+  });
   return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob!), "image/png"));
 }
 
