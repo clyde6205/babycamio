@@ -291,7 +291,7 @@ const ViewerView = () => {
   const isReconnecting = connectionState === ConnectionState.Reconnecting;
   const friendlyName = resolvedRoomName ? friendlyRoomName(resolvedRoomName) : "Private Camera";
   const privateViewerKey = resolvedRoomId || roomName || "";
-  const viewerUrl = viewerLink(privateViewerKey);
+  const viewerUrl = viewerLink(roomName || "");
 
   return (
     <div ref={containerRef} className="flex min-h-[100dvh] select-none flex-col bg-black text-white">
