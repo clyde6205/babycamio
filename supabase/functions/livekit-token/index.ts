@@ -129,7 +129,9 @@ serve(async (req) => {
         // what prevents them from publishing camera or screen tracks.
         canPublish: true,
         canSubscribe: true,
-        canPublishData: true,
+        // Viewer clients must never publish control/alert data. Talkback only needs
+        // microphone media publishing, not LiveKit data packets.
+        canPublishData: isPublisher,
         ...(isPublisher ? {} : { canPublishSources: ["microphone"] }),
       },
     };
