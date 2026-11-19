@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => ({
         cleanupOutdatedCaches: true,
         // Precache the app shell and code only; media is cached on demand for slow mobile data.
         globPatterns: ["**/*.{js,css,html,ico,webmanifest}"],
-        maximumFileSizeToCacheInBytes: 768 * 1024,
+        maximumFileSizeToCacheInBytes: 1024 * 1024,
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api/, /^\/functions/, /^https:\/\/.*\.supabase\.co/],
         ignoreURLParametersMatching: [/^utm_/, /^fbclid$/],
