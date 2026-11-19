@@ -36,6 +36,9 @@ jobs:
           npm install --no-audit
           npm audit fix || true
 
+      - name: TypeScript
+        run: npx tsc --noEmit -p tsconfig.app.json
+
       - name: Lint
         run: npm run lint
 
