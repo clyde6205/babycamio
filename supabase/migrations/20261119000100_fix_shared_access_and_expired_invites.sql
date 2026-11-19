@@ -11,12 +11,12 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.rooms r
     WHERE r.id = _room_id AND r.owner_id = auth.uid()
   );
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.is_room_owner(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.is_room_owner(uuid) TO authenticated;
