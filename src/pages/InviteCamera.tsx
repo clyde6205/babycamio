@@ -60,7 +60,7 @@ const InviteCamera = () => {
             Tap below — the live view opens instantly in your browser through a private link. No app or account needed.
           </p>
           <Button asChild size="lg" className="touch-target w-full">
-            <Link to={`/viewer/${encodeURIComponent(state.roomId)}`}>Watch live now</Link>
+            <Link to={`/viewer/${encodeURIComponent(token || "")}`}>Watch live now</Link>
           </Button>
         </div>
       )}
