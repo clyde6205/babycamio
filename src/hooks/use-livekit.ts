@@ -543,7 +543,7 @@ export const useLiveKit = ({
   const startQualityCheck = useCallback(() => {
     if (qualityCheckRef.current) clearInterval(qualityCheckRef.current);
 
-    qualityCheckRef.current = window.setInterval(() => {
+    qualityCheckRef.current = window.setInterval(async () => {
       if (intentionalDisconnect.current || !roomRef.current) {
         if (qualityCheckRef.current) clearInterval(qualityCheckRef.current);
         return;
