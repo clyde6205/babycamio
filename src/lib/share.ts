@@ -2,7 +2,7 @@ import { Capacitor } from "@capacitor/core";
 
 /** Public base for every link people share — always the live domain, never the app's internal address. */
 export const PUBLIC_BASE = "https://babycam.io";
-/** roomKey must be the room UUID for anonymous/private viewer access. */
+/** roomKey must be a revocable invitation token, never a room primary key. */
 export const viewerLink = (roomKey: string) => `${PUBLIC_BASE}/viewer/${encodeURIComponent(roomKey)}`;
 
 export const isNative = () => Capacitor.isNativePlatform();
