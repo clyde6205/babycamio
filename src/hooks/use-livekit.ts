@@ -265,6 +265,9 @@ export const useLiveKit = ({
   const intentionalDisconnect = useRef(false);
   const connectAttemptRef = useRef(0);
   const lastQualityRef = useRef<NetworkQuality>("good");
+  const scheduleReconnectRef = useRef<() => void>(() => {});
+  const startHeartbeatRef = useRef<(room: Room) => void>(() => {});
+  const startQualityCheckRef = useRef<() => void>(() => {});
 
   // ── Network monitor: handles WiFi ↔ Cellular ↔ Bluetooth switches ──
   useEffect(() => {
@@ -446,7 +449,7 @@ export const useLiveKit = ({
 
         if (!intentionalDisconnect.current && thisAttempt === connectAttemptRef.current) {
           setError("Connection lost — reconnecting…");
-          scheduleReconnect();
+          scheduleReconnectRef.current();
         }
       });
 
@@ -478,10 +481,10 @@ export const useLiveKit = ({
       await enableDevices(room, quality, preAcquiredStream);
 
       // Start heartbeat
-      startHeartbeat(room);
+      startHeartbeatRef.current(room);
 
       // Start periodic quality check (adapts mid-stream)
-      startQualityCheck();
+      startQualityCheckRef.current();
 
     } catch (err: any) {
       console.error("[LiveKit] Connection failed:", err.message);
@@ -491,7 +494,7 @@ export const useLiveKit = ({
       if (thisAttempt === connectAttemptRef.current && !intentionalDisconnect.current) {
         setError(err.message || "Failed to connect");
         setConnectionState(ConnectionState.Disconnected);
-        scheduleReconnect();
+        scheduleReconnectRef.current();
       }
     } finally {
       setIsConnecting(false);
@@ -551,6 +554,13 @@ export const useLiveKit = ({
       setConnectionType(ct);
     }, 15_000); // Check every 15 seconds
   }, []);
+
+  // Keep mutually-referencing reconnect callbacks current without a hook dependency cycle.
+  useEffect(() => {
+    scheduleReconnectRef.current = scheduleReconnect;
+    startHeartbeatRef.current = startHeartbeat;
+    startQualityCheckRef.current = startQualityCheck;
+  }, [scheduleReconnect, startHeartbeat, startQualityCheck]);
 
   // ── Visibility: reconnect on foreground (Android app resume) ──
   useEffect(() => {
