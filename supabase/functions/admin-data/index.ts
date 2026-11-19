@@ -110,7 +110,7 @@ serve(async (req) => {
     if (body.action === "set_admin") {
       const userId = typeof body.userId === "string" ? body.userId : "";
       const grant = body.grant === true;
-      if (!userId) return json({ error: "Invalid input" }, 400);
+      if (!userId || typeof body.grant !== "boolean") return json({ error: "Invalid input" }, 400);
       if (!grant && userId === user.id) return json({ error: "You cannot remove your own admin role" }, 400);
       const { error } = grant
         ? await supabase.from("user_roles").upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" })
@@ -122,7 +122,7 @@ serve(async (req) => {
     if (body.action === "set_banned") {
       const userId = typeof body.userId === "string" ? body.userId : "";
       const banned = body.banned === true;
-      if (!userId || userId === user.id) return json({ error: "Invalid input" }, 400);
+      if (!userId || userId === user.id || typeof body.banned !== "boolean") return json({ error: "Invalid input" }, 400);
       const { error } = await supabase.auth.admin.updateUserById(userId, { ban_duration: banned ? "876000h" : "none" });
       if (error) throw error;
       return json({ success: true });
@@ -131,12 +131,15 @@ serve(async (req) => {
     if (body.action === "set_room_active") {
       const roomId = typeof body.roomId === "string" ? body.roomId : "";
       const active = body.active === true;
-      const { error } = await supabase.from("rooms").update({ is_active: !!active }).eq("id", roomId);
+      if (!roomId || typeof body.active !== "boolean") return json({ error: "Invalid input" }, 400);
+      const { error } = await supabase.from("rooms").update({ is_active: active }).eq("id", roomId);
       if (error) throw error;
       return json({ success: true });
     }
 
     if (body.action === "delete_room") {
+      const roomId = typeof body.roomId === "string" ? body.roomId : "";
+      if (!roomId) return json({ error: "Invalid input" }, 400);
       const { error } = await supabase.from("rooms").delete().eq("id", roomId);
       if (error) throw error;
       return json({ success: true });
