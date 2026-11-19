@@ -343,6 +343,38 @@ const CameraView = () => {
     };
   }, [room, connectionState]);
 
+  const createViewerLink = useCallback(async (): Promise<string | null> => {
+    if (viewerAccessToken) return viewerAccessToken;
+    if (shareLinkPromiseRef.current) return shareLinkPromiseRef.current;
+    if (!roomId || !userId) return null;
+
+    const task = (async () => {
+      const token = crypto.randomUUID();
+      const { error } = await supabase.from("shared_access").insert({
+        room_id: roomId,
+        granted_by: userId,
+        shared_with_email: "link-access@babycam.io",
+        access_code: token,
+        is_active: true,
+      });
+      if (error) {
+        console.error("[CameraShare] Could not create private viewer link:", error.message);
+        toast({ title: "Could not create viewer link", description: error.message, variant: "destructive" });
+        return null;
+      }
+      setViewerAccessToken(token);
+      return token;
+    })();
+
+    shareLinkPromiseRef.current = task;
+    try {
+      return await task;
+    } finally {
+      shareLinkPromiseRef.current = null;
+    }
+  }, [viewerAccessToken, roomId, userId, toast]);
+
+
   const sharedOnceRef = useRef(false);
   useEffect(() => {
     if (connectionState === ConnectionState.Connected) {
@@ -396,36 +428,6 @@ const CameraView = () => {
     return `${hours > 0 ? `${hours}:` : ""}${minutes.toString().padStart(2, "0")}:${remainder.toString().padStart(2, "0")}`;
   };
 
-  const createViewerLink = useCallback(async (): Promise<string | null> => {
-    if (viewerAccessToken) return viewerAccessToken;
-    if (shareLinkPromiseRef.current) return shareLinkPromiseRef.current;
-    if (!roomId || !userId) return null;
-
-    const task = (async () => {
-      const token = crypto.randomUUID();
-      const { error } = await supabase.from("shared_access").insert({
-        room_id: roomId,
-        granted_by: userId,
-        shared_with_email: "link-access@babycam.io",
-        access_code: token,
-        is_active: true,
-      });
-      if (error) {
-        console.error("[CameraShare] Could not create private viewer link:", error.message);
-        toast({ title: "Could not create viewer link", description: error.message, variant: "destructive" });
-        return null;
-      }
-      setViewerAccessToken(token);
-      return token;
-    })();
-
-    shareLinkPromiseRef.current = task;
-    try {
-      return await task;
-    } finally {
-      shareLinkPromiseRef.current = null;
-    }
-  }, [viewerAccessToken, roomId, userId, toast]);
 
   const openShare = async () => {
     if (!roomId || !userId) {
