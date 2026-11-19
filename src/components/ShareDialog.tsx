@@ -88,8 +88,8 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
       setEmail("");
       await loadSharedUsers();
       toast({ title: t("share.accessShared"), description: `A revocable private viewer link was prepared for ${to}.` });
-    } catch (err: any) {
-      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: t("common.error"), description: err instanceof Error ? err.message : "Unexpected sharing error", variant: "destructive" });
     } finally {
       setSharing(false);
     }
