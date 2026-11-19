@@ -115,40 +115,31 @@ serve(async (req) => {
       // Anchor the subscription window to the immutable invoice creation time
       // so repeated IPN deliveries do not extend the subscription repeatedly.
       const invoiceCreatedAt = Number(invoiceData.invoiceTime);
-      const now = Number.isFinite(invoiceCreatedAt) && invoiceCreatedAt > 0
-        ? new Date(invoiceCreatedAt)
-        : new Date();
-      const periodEnd = new Date(now);
+      if (!Number.isFinite(invoiceCreatedAt) || invoiceCreatedAt <= 0) {
+        throw new Error("Verified BitPay invoice is missing its immutable creation time");
+      }
+      const periodStart = new Date(invoiceCreatedAt);
+      const periodEnd = new Date(periodStart);
       if (billing === "annual") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
       else periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-      const { data: existingSub } = await supabase
+      const { error: subscriptionLookupError } = await supabase
         .from("subscriptions")
         .select("id")
         .eq("user_id", userId)
         .maybeSingle();
+      if (subscriptionLookupError) throw subscriptionLookupError;
 
-      if (existingSub) {
-        const { error } = await supabase.from("subscriptions").update({
-          plan: "pro",
-          status: "active",
-          payment_provider: "bitpay",
-          current_period_start: now.toISOString(),
-          current_period_end: periodEnd.toISOString(),
-          cancel_at_period_end: false,
-        }).eq("id", existingSub.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("subscriptions").insert({
-          user_id: userId,
-          plan: "pro",
-          status: "active",
-          payment_provider: "bitpay",
-          current_period_start: now.toISOString(),
-          current_period_end: periodEnd.toISOString(),
-        });
-        if (error) throw error;
-      }
+      const { error: subscriptionWriteError } = await supabase.from("subscriptions").upsert({
+        user_id: userId,
+        plan: "pro",
+        status: "active",
+        payment_provider: "bitpay",
+        current_period_start: periodStart.toISOString(),
+        current_period_end: periodEnd.toISOString(),
+        cancel_at_period_end: false,
+      }, { onConflict: "user_id" });
+      if (subscriptionWriteError) throw subscriptionWriteError;
     }
 
     return json({ success: true, status: paymentStatus });
