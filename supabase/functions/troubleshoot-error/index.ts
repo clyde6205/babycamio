@@ -44,15 +44,20 @@ Deno.serve(async (req) => {
       const text = await call.result.text;
       if (!text.trim()) return json({ error: "The AI couldn't produce an answer for this error." }, 502);
       return json({ answer: text });
-    } catch (e: any) {
-      const status = e?.statusCode ?? e?.lastError?.statusCode ?? 500;
+    } catch (e: unknown) {
+      const record = e && typeof e === "object" ? e as Record<string, unknown> : {};
+      const nested = record.lastError && typeof record.lastError === "object"
+        ? record.lastError as Record<string, unknown>
+        : {};
+      const statusValue = record.statusCode ?? nested.statusCode;
+      const status = typeof statusValue === "number" ? statusValue : 500;
       if (status === 429) return json({ error: "Too many requests right now. Please wait a minute and try again." }, 429);
       if (status === 402) return json({ error: "AI credits have run out. Add credits in workspace billing to keep using this." }, 402);
       if (status === 403) return json({ error: "AI access is blocked for this workspace." }, 403);
-      console.error("gateway error", status, e?.message);
+      console.error("gateway error", status, record.message);
       return json({ error: "The AI service had a problem. Please try again shortly." }, status >= 500 ? 502 : status);
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (req.signal.aborted) return new Response(null, { status: 499, headers: cors });
     console.error(e);
     return json({ error: "Something went wrong." }, 500);
