@@ -165,7 +165,7 @@ const ShareDialog = ({ roomId, roomName, userId }: ShareDialogProps) => {
                 {sharedUsers.map((viewer) => (
                   <div key={viewer.id} className={`flex items-center justify-between gap-2 rounded-lg border p-2.5 text-sm ${!viewer.is_active ? "opacity-50" : ""}`}>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{viewer.shared_with_email}</p>
+                      <p className="truncate font-medium">{viewer.shared_with_email === "link-access@babycam.io" ? "Anyone with this link" : viewer.shared_with_email}</p>
                       <p className="text-xs text-muted-foreground">
                         {viewer.is_active ? "Private link active" : "Access revoked"}
                       </p>
