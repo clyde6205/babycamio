@@ -3,6 +3,24 @@
 
 -- A grantor may only manage shares for rooms they own. Recipients may read only
 -- their own active grant so the room RLS policy can evaluate membership.
+-- Use a SECURITY DEFINER predicate to avoid recursive RLS evaluation:
+-- rooms policies inspect shared_access, so shared_access policies must not query rooms directly.
+CREATE OR REPLACE FUNCTION public.is_room_owner(_room_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $
+  SELECT EXISTS (
+    SELECT 1 FROM public.rooms r
+    WHERE r.id = _room_id AND r.owner_id = auth.uid()
+  );
+$;
+
+REVOKE ALL ON FUNCTION public.is_room_owner(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_room_owner(uuid) TO authenticated;
+
 DROP POLICY IF EXISTS "Grantors manage shared access" ON public.shared_access;
 DROP POLICY IF EXISTS "Recipients read their active shared access" ON public.shared_access;
 
@@ -12,10 +30,7 @@ FOR ALL
 TO authenticated
 USING (
   granted_by = auth.uid()
-  AND EXISTS (
-    SELECT 1 FROM public.rooms r
-    WHERE r.id = shared_access.room_id AND r.owner_id = auth.uid()
-  )
+  AND public.is_room_owner(shared_access.room_id)
 )
 WITH CHECK (
   granted_by = auth.uid()
@@ -42,10 +57,7 @@ FOR ALL
 TO authenticated
 USING (
   owner_id = auth.uid()
-  AND EXISTS (
-    SELECT 1 FROM public.rooms r
-    WHERE r.id = camera_invitations.room_id AND r.owner_id = auth.uid()
-  )
+  AND public.is_room_owner(camera_invitations.room_id)
 )
 WITH CHECK (
   owner_id = auth.uid()
