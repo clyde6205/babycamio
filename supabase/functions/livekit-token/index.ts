@@ -18,8 +18,12 @@ const json = (data: unknown, status = 200) =>
   });
 
 const cleanText = (value: unknown, maxLength: number) =>
-  String(value ?? "")
-    .replace(/[\u0000-\u001f\u007f]/g, "")
+  Array.from(String(value ?? ""))
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code > 31 && code !== 127;
+    })
+    .join("")
     .trim()
     .slice(0, maxLength);
 
