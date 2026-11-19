@@ -45,7 +45,7 @@ serve(async (req) => {
     const invoiceResponseBody = await invoiceResponse.json();
     const invoiceData = invoiceResponseBody.data || invoiceResponseBody;
     if (invoiceData.id !== invoiceId) return json({ error: "BitPay invoice ID mismatch" }, 400);
-    if (invoiceData.currency !== "USD") return json({ error: "BitPay invoice currency does not match USD pricing" }, 400);
+    if (String(invoiceData.currency || "").toUpperCase() !== "USD") return json({ error: "BitPay invoice currency does not match USD pricing" }, 400);
     const event = notification.event?.name || notification.status;
 
     const status = invoiceData.status;
