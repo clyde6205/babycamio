@@ -40,14 +40,15 @@ serve(async (req) => {
     }
 
     // Parse body
-    let body: any = {};
-    try { body = await req.json(); } catch { /* no body = default fetch */ }
+    type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+    let body: Record<string, unknown> = {};
+    try { const parsed: unknown = await req.json(); if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) body = parsed as Record<string, unknown>; } catch { /* no body = default fetch */ }
 
     // Handle admin actions
     if (body.action === "update_motion_settings") {
       const { error } = await supabase
         .from("app_settings")
-        .update({ setting_value: body.settings, updated_by: user.id })
+        .update({ setting_value: body.settings as Json, updated_by: user.id })
         .eq("setting_key", "motion_recording");
       if (error) throw error;
       return new Response(JSON.stringify({ success: true }), {
@@ -56,7 +57,9 @@ serve(async (req) => {
     }
 
     if (body.action === "update_user_camera") {
-      const { userId, field, value } = body;
+      const userId = typeof body.userId === "string" ? body.userId : "";
+      const field = typeof body.field === "string" ? body.field : "";
+      const value = body.value as Json;
       const allowedFields = ["recording_duration_minutes", "motion_enabled", "motion_sensitivity"];
       if (!allowedFields.includes(field)) throw new Error("Invalid field");
       
@@ -90,7 +93,9 @@ serve(async (req) => {
     });
 
     if (body.action === "set_plan") {
-      const { userId, plan, months } = body;
+      const userId = typeof body.userId === "string" ? body.userId : "";
+      const plan = body.plan === "pro" ? "pro" : body.plan === "free" ? "free" : "";
+      const months = Number(body.months);
       if (!userId || !["free", "pro"].includes(plan)) return json({ error: "Invalid input" }, 400);
       const end = plan === "pro" ? new Date(Date.now() + (Number(months) || 1) * 30 * 86400000).toISOString() : null;
       const { data: existing } = await supabase.from("subscriptions").select("id").eq("user_id", userId).maybeSingle();
@@ -103,7 +108,8 @@ serve(async (req) => {
     }
 
     if (body.action === "set_admin") {
-      const { userId, grant } = body;
+      const userId = typeof body.userId === "string" ? body.userId : "";
+      const grant = body.grant === true;
       if (!userId) return json({ error: "Invalid input" }, 400);
       if (!grant && userId === user.id) return json({ error: "You cannot remove your own admin role" }, 400);
       const { error } = grant
@@ -114,7 +120,8 @@ serve(async (req) => {
     }
 
     if (body.action === "set_banned") {
-      const { userId, banned } = body;
+      const userId = typeof body.userId === "string" ? body.userId : "";
+      const banned = body.banned === true;
       if (!userId || userId === user.id) return json({ error: "Invalid input" }, 400);
       const { error } = await supabase.auth.admin.updateUserById(userId, { ban_duration: banned ? "876000h" : "none" });
       if (error) throw error;
@@ -122,14 +129,15 @@ serve(async (req) => {
     }
 
     if (body.action === "set_room_active") {
-      const { roomId, active } = body;
+      const roomId = typeof body.roomId === "string" ? body.roomId : "";
+      const active = body.active === true;
       const { error } = await supabase.from("rooms").update({ is_active: !!active }).eq("id", roomId);
       if (error) throw error;
       return json({ success: true });
     }
 
     if (body.action === "delete_room") {
-      const { error } = await supabase.from("rooms").delete().eq("id", body.roomId);
+      const { error } = await supabase.from("rooms").delete().eq("id", roomId);
       if (error) throw error;
       return json({ success: true });
     }
@@ -145,7 +153,7 @@ serve(async (req) => {
       supabase.from("user_roles").select("user_id, role"),
       supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     ]);
-    const authUsers = (authRes.data?.users || []).map((u: any) => ({
+    const authUsers = (authRes.data?.users || []).map((u) => ({
       id: u.id, email: u.email, last_sign_in_at: u.last_sign_in_at, confirmed: !!u.email_confirmed_at,
       banned: !!u.banned_until && new Date(u.banned_until) > new Date(),
     }));
@@ -157,8 +165,8 @@ serve(async (req) => {
     const stats = {
       users: profiles.length,
       rooms: rooms.length,
-      activeRooms: rooms.filter((r: any) => r.is_active).length,
-      proUsers: subscriptions.filter((s: any) => s.plan === "pro" && s.status === "active").length,
+      activeRooms: rooms.filter((r) => r.is_active).length,
+      proUsers: subscriptions.filter((s) => s.plan === "pro" && s.status === "active").length,
     };
 
     return new Response(
