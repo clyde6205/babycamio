@@ -109,6 +109,23 @@ serve(async (req) => {
         if (!isOwner && !sharedAccess?.length) return json({ error: "Viewer link is invalid or has been revoked" }, 403);
         room = data;
       }
+    } else if (/^[0-9a-f]{48}$/i.test(roomKey)) {
+      // Email invitations use high-entropy 48-character tokens. Validate expiry
+      // again here; the landing-page RPC is not an authorization boundary.
+      const { data: invitation, error: invitationError } = await supabase
+        .from("camera_invitations")
+        .select("room_id")
+        .eq("token", roomKey)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
+      if (invitationError || !invitation) return json({ error: "Invitation is invalid or has expired" }, 403);
+      const { data, error } = await supabase
+        .from("rooms")
+        .select("id, room_name, owner_id")
+        .eq("id", invitation.room_id)
+        .maybeSingle();
+      if (error || !data) return json({ error: "Camera room not found" }, 404);
+      room = data;
     } else if (userId) {
       const { data, error } = await supabase
         .from("rooms")
