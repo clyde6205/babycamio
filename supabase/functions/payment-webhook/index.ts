@@ -105,7 +105,9 @@ async function claimWebhookEvent(
   if (existing.status === "processed") return false;
   if (existing.status === "processing" && ageMs < 5 * 60 * 1000) return false;
 
-  const { error: retryError } = await supabase
+  // Compare-and-swap the stale/failed claim. Concurrent provider retries may
+  // both observe the same old row; only the first update may reclaim it.
+  const { data: reclaimed, error: retryError } = await supabase
     .from("payment_webhook_events")
     .update({
       status: "processing",
@@ -115,9 +117,13 @@ async function claimWebhookEvent(
       last_error: null,
     })
     .eq("provider", provider)
-    .eq("event_id", eventId);
+    .eq("event_id", eventId)
+    .eq("status", existing.status)
+    .eq("received_at", existing.received_at)
+    .select("event_id")
+    .maybeSingle();
   if (retryError) throw retryError;
-  return true;
+  return Boolean(reclaimed);
 }
 
 serve(async (req) => {
