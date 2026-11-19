@@ -44,7 +44,7 @@ export default defineConfig(({ mode }) => ({
             },
           },
           {
-            urlPattern: /\\.(?:png|jpe?g|webp|avif|gif)$/i,
+            urlPattern: /\.(?:png|jpe?g|webp|avif|gif)$/i,
             handler: "CacheFirst",
             options: {
               cacheName: "babycam-images",
