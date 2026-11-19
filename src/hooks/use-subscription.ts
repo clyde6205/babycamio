@@ -31,7 +31,10 @@ export function useSubscription() {
     fetch();
   }, []);
 
-  const isPro = subscription?.plan === "pro" && subscription?.status === "active";
+  const isPro =
+    subscription?.plan === "pro" &&
+    ["active", "trialing"].includes(subscription.status) &&
+    (!subscription.current_period_end || new Date(subscription.current_period_end).getTime() > Date.now());
 
   return { subscription, loading, isPro };
 }
