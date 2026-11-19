@@ -148,7 +148,19 @@ serve(async (req) => {
       status: "pending",
       metadata: { plan, billing, invoice_id: invoiceId, payment_currency: "XRP" },
     });
-    if (paymentInsertError) {
+    if (paymentInsertError?.code === "23505") {
+      // A very fast BitPay IPN may have inserted the verified invoice first.
+      const { data: existingPayment, error: existingPaymentError } = await supabase
+        .from("payments")
+        .select("user_id")
+        .eq("payment_provider", "bitpay")
+        .eq("provider_payment_id", invoiceId)
+        .maybeSingle();
+      if (existingPaymentError || existingPayment?.user_id !== userId) {
+        console.error("[BitPayCheckout] Duplicate invoice payment could not be reconciled:", existingPaymentError);
+        return json({ error: "Unable to safely reconcile this checkout. Please contact support." }, 500);
+      }
+    } else if (paymentInsertError) {
       console.error("[BitPayCheckout] Failed to record pending payment:", paymentInsertError);
       return json({ error: "Unable to record checkout. Please contact support before retrying." }, 500);
     }
