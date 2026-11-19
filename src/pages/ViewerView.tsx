@@ -290,7 +290,6 @@ const ViewerView = () => {
   const isConnected = connectionState === ConnectionState.Connected;
   const isReconnecting = connectionState === ConnectionState.Reconnecting;
   const friendlyName = resolvedRoomName ? friendlyRoomName(resolvedRoomName) : "Private Camera";
-  const privateViewerKey = resolvedRoomId || roomName || "";
   const viewerUrl = viewerLink(roomName || "");
 
   return (
