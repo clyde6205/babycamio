@@ -122,7 +122,7 @@ serve(async (req) => {
     const invoiceId = invoiceData.data?.id || invoiceData.id;
     if (!invoiceUrl || !invoiceId) throw new Error("BitPay did not return an invoice URL");
 
-    await supabase.from("payments").insert({
+    const { error: paymentInsertError } = await supabase.from("payments").insert({
       user_id: userId,
       amount_cents: Math.round(price * 100),
       currency: "USD",
@@ -131,6 +131,10 @@ serve(async (req) => {
       status: "pending",
       metadata: { plan, billing, invoice_id: invoiceId, payment_currency: "XRP" },
     });
+    if (paymentInsertError) {
+      console.error("[BitPayCheckout] Failed to record pending payment:", paymentInsertError);
+      return json({ error: "Unable to record checkout. Please contact support before retrying." }, 500);
+    }
 
     return json({ url: invoiceUrl, provider: "bitpay", invoiceId });
   } catch (err: unknown) {
