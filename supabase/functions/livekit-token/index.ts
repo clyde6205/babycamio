@@ -70,13 +70,45 @@ serve(async (req) => {
       if (!userId || data.owner_id !== userId) return json({ error: "Only the room owner can broadcast" }, 403);
       room = data;
     } else if (UUID_PATTERN.test(roomKey)) {
-      const { data, error } = await supabase
-        .from("rooms")
-        .select("id, room_name, owner_id")
-        .eq("id", roomKey)
+      // UUID-shaped viewer links are per-invitation share tokens, not room IDs.
+      // Revoking the shared_access row immediately prevents future token issuance.
+      const { data: shareGrant } = await supabase
+        .from("shared_access")
+        .select("room_id")
+        .eq("access_code", roomKey)
+        .eq("is_active", true)
         .maybeSingle();
-      if (error || !data) return json({ error: "Viewer link is invalid" }, 404);
-      room = data;
+
+      if (shareGrant?.room_id) {
+        const { data, error } = await supabase
+          .from("rooms")
+          .select("id, room_name, owner_id")
+          .eq("id", shareGrant.room_id)
+          .maybeSingle();
+        if (error || !data) return json({ error: "Viewer link is invalid" }, 404);
+        room = data;
+      } else {
+        // Room UUIDs remain usable by the owner and authenticated family members
+        // with an active grant; anonymous users must use an invitation token.
+        const { data, error } = await supabase
+          .from("rooms")
+          .select("id, room_name, owner_id")
+          .eq("id", roomKey)
+          .maybeSingle();
+        if (error || !data) return json({ error: "Viewer link is invalid" }, 404);
+        const isOwner = userId === data.owner_id;
+        const { data: sharedAccess } = userEmail
+          ? await supabase
+              .from("shared_access")
+              .select("id")
+              .eq("room_id", data.id)
+              .eq("shared_with_email", userEmail)
+              .eq("is_active", true)
+              .limit(1)
+          : { data: null };
+        if (!isOwner && !sharedAccess?.length) return json({ error: "Viewer link is invalid or has been revoked" }, 403);
+        room = data;
+      }
     } else if (userId) {
       const { data, error } = await supabase
         .from("rooms")
