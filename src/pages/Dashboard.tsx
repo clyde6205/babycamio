@@ -175,9 +175,23 @@ const Dashboard = () => {
   };
 
   const handleJoinRoom = () => {
-    const code = joinCode.trim();
-    if (!code) return;
-    navigate(`/viewer/${encodeURIComponent(code)}`);
+    const value = joinCode.trim();
+    if (!value) return;
+    let roomKey = value;
+    try {
+      const parsed = new URL(value);
+      if (parsed.origin !== "https://babycam.io" && parsed.origin !== "https://www.babycam.io") return;
+      const match = parsed.pathname.match(/^\/viewer\/([^/]+)\/?$/);
+      if (!match) return;
+      roomKey = decodeURIComponent(match[1]);
+    } catch {
+      // A bare room UUID is also accepted; access codes are not valid viewer credentials.
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(roomKey)) {
+      toast({ title: "Invalid viewer link", description: "Paste the full private viewer link or room UUID.", variant: "destructive" });
+      return;
+    }
+    navigate(`/viewer/${encodeURIComponent(roomKey)}`);
   };
 
   if (authLoading) {
@@ -265,12 +279,12 @@ const Dashboard = () => {
 
         {showJoin && (
           <Card className="mb-6 p-4">
-            <p className="mb-2 text-sm text-muted-foreground">Paste the private viewer code or link sent by the camera owner:</p>
+            <p className="mb-2 text-sm text-muted-foreground">Paste the private viewer link or room UUID sent by the camera owner:</p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}
-                placeholder="Private viewer code"
+                placeholder="Private viewer link or room UUID"
                 className="touch-target"
                 onKeyDown={(e) => e.key === "Enter" && handleJoinRoom()}
               />
