@@ -59,11 +59,15 @@ const Settings = () => {
       .eq("setting_key", "motion_recording")
       .single();
 
-    const global = globalSettings?.setting_value as any;
-    if (global) {
-      setMaxDuration(global.max_duration_minutes || 60);
-      setMotionSensitivity(global.motion_sensitivity || 25);
-      setRecordingDuration(global.default_duration_minutes || 5);
+    const globalValue = globalSettings?.setting_value;
+    if (globalValue && typeof globalValue === "object" && !Array.isArray(globalValue)) {
+      const global = globalValue as Record<string, unknown>;
+      const maxDuration = Number(global.max_duration_minutes);
+      const sensitivity = Number(global.motion_sensitivity);
+      const defaultDuration = Number(global.default_duration_minutes);
+      setMaxDuration(Number.isFinite(maxDuration) && maxDuration > 0 ? maxDuration : 60);
+      setMotionSensitivity(Number.isFinite(sensitivity) && sensitivity > 0 ? sensitivity : 25);
+      setRecordingDuration(Number.isFinite(defaultDuration) && defaultDuration > 0 ? defaultDuration : 5);
     }
 
     // Load user overrides
@@ -96,8 +100,8 @@ const Settings = () => {
         }, { onConflict: "user_id" });
       if (error) throw error;
       toast({ title: "Camera settings saved", description: `Recording: ${clampedDuration} min, Motion: ${motionEnabled ? "On" : "Off"}` });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Unexpected settings error", variant: "destructive" });
     } finally { setSavingCamera(false); }
   };
 
@@ -107,7 +111,7 @@ const Settings = () => {
     if (data) {
       const grouped: Record<string, Record<string, string>> = {};
       const configured = new Set<string>();
-      data.forEach((row: any) => {
+      data.forEach((row) => {
         if (!grouped[row.provider]) grouped[row.provider] = {};
         grouped[row.provider][row.key_name] = row.key_value;
         configured.add(row.provider);
@@ -141,7 +145,7 @@ const Settings = () => {
       }
       setSavedProviders((prev) => new Set([...prev, provider.id]));
       toast({ title: `${provider.name} configured`, description: t("settings.keysSaved") });
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({ title: t("common.error"), description: err.message, variant: "destructive" });
     } finally { setSaving(null); }
   };
@@ -155,7 +159,7 @@ const Settings = () => {
       setKeyValues((prev) => { const next = { ...prev }; delete next[providerId]; return next; });
       setSavedProviders((prev) => { const next = new Set(prev); next.delete(providerId); return next; });
       toast({ title: t("settings.providerRemoved") });
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({ title: t("common.error"), description: err.message, variant: "destructive" });
     } finally { setSaving(null); }
   };
