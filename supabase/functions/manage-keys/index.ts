@@ -52,7 +52,7 @@ serve(async (req) => {
     if (error) throw error;
 
     const keys: Record<string, string> = {};
-    (data || []).forEach((row: any) => {
+    (data || []).forEach((row) => {
       keys[row.key_name] = row.key_value;
     });
 
