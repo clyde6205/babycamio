@@ -93,7 +93,8 @@ export default defineConfig(({ mode }) => ({
         manualChunks(id) {
           if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/") || id.includes("node_modules/react-router")) return "vendor-react";
           if (id.includes("node_modules/@radix-ui/")) return "vendor-ui";
-          if (id.includes("node_modules/recharts/")) return "vendor-charts";
+          // Keep Recharts with its lazy analytics route. A shared vendor chunk
+          // made Vite preload the charting library on the public landing page.
           if (id.includes("node_modules/@tanstack/react-query/")) return "vendor-query";
         },
       },
