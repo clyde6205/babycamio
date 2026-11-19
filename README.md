@@ -67,8 +67,9 @@ Required for BitPay:
 
 ```bash
 BITPAY_API_TOKEN=...
-BITPAY_WEBHOOK_SECRET=...
 ```
+
+The BitPay webhook treats IPNs only as notifications and retrieves the invoice from BitPay's API with this token before processing payment status. Do not trust IPN payload fields as payment evidence.
 
 Optional checkout origin controls:
 
