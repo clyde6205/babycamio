@@ -24,7 +24,8 @@ export default defineConfig(({ mode }) => ({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         // Precache the app shell and code only; media is cached on demand for slow mobile data.
-        globPatterns: ["**/*.{js,css,html,ico,webmanifest}"],
+        // Lean install: preload only the shell and initial entry dependencies.
+        globPatterns: ["**/*.{css,html,ico,webmanifest}", "assets/index-*.js", "assets/vendor-react-*.js", "assets/vendor-ui-*.js", "assets/vendor-query-*.js"],
         maximumFileSizeToCacheInBytes: 1024 * 1024,
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api/, /^\/functions/, /^https:\/\/.*\.supabase\.co/],
@@ -42,6 +43,11 @@ export default defineConfig(({ mode }) => ({
               cacheName: "google-fonts-webfonts",
               expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
             },
+          },
+          {
+            urlPattern: ({ request, url }) => request.destination === "script" && url.pathname.startsWith("/assets/"),
+            handler: "CacheFirst",
+            options: { cacheName: "babycam-route-chunks", expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 30 } },
           },
           {
             urlPattern: /\.(?:png|jpe?g|webp|avif|gif)$/i,
