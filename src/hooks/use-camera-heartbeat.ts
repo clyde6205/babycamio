@@ -72,10 +72,8 @@ export function useCameraHeartbeat({
 
   // Send heartbeat on connection changes immediately
   useEffect(() => {
-    if (userId && roomName) {
-      sendHeartbeat();
-    }
-  }, [isConnected, networkQuality, sendHeartbeat]);
+    void sendHeartbeat();
+  }, [sendHeartbeat]);
 
   // Periodic heartbeat
   useEffect(() => {
