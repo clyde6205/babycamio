@@ -130,6 +130,21 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   let activeEvent: { provider: string; eventId: string } | null = null;
+  const rejectActiveEvent = async (body: unknown, status: number): Promise<Response> => {
+    if (activeEvent) {
+      const message = typeof body === "object" && body !== null && "error" in body
+        ? String((body as { error: unknown }).error)
+        : "Webhook event rejected";
+      const { error } = await supabase
+        .from("payment_webhook_events")
+        .update({ status: "failed", last_error: message.slice(0, 1000) })
+        .eq("provider", activeEvent.provider)
+        .eq("event_id", activeEvent.eventId);
+      if (error) console.error("[PaymentWebhook] Could not mark rejected event:", error);
+      activeEvent = null;
+    }
+    return json(body, status);
+  };
   try {
     const url = new URL(req.url);
     const provider = url.searchParams.get("provider") || "stripe";
@@ -167,11 +182,11 @@ serve(async (req) => {
             session.amount_total !== expectedAmount ||
             typeof session.subscription !== "string"
           ) {
-            return json({ error: "Stripe checkout does not match a valid BabyCam Pro purchase" }, 400);
+            return await rejectActiveEvent({ error: "Stripe checkout does not match a valid BabyCam Pro purchase" }, 400);
           }
 
           const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-          if (!stripeKey) return json({ error: "Stripe API is not configured" }, 503);
+          if (!stripeKey) return await rejectActiveEvent({ error: "Stripe API is not configured" }, 503);
           const stripeSubscriptionResponse = await fetch(
             `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(session.subscription)}`,
             { headers: { Authorization: `Bearer ${stripeKey}` } },
@@ -182,7 +197,7 @@ serve(async (req) => {
           }
           const stripeSubscription = await stripeSubscriptionResponse.json();
           if (!["active", "trialing"].includes(stripeSubscription.status)) {
-            return json({ error: "Stripe subscription is not active" }, 409);
+            return await rejectActiveEvent({ error: "Stripe subscription is not active" }, 409);
           }
           const periodStart = new Date(Number(stripeSubscription.current_period_start) * 1000);
           const periodEnd = new Date(Number(stripeSubscription.current_period_end) * 1000);
@@ -209,7 +224,7 @@ serve(async (req) => {
           const invoice = event.data?.object || {};
           const subscriptionId = typeof invoice.subscription === "string"
             ? invoice.subscription
-            : invoice.subscription?.id;
+            : invoice.subscription?.id || invoice.parent?.subscription_details?.subscription;
           if (typeof subscriptionId === "string") {
             const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
             if (!stripeKey) return json({ error: "Stripe API is not configured" }, 503);
@@ -223,7 +238,7 @@ serve(async (req) => {
             const validUserId = typeof userId === "string" &&
               /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
             if (!validUserId || !["active", "trialing"].includes(stripeSubscription.status)) {
-              return json({ error: "Stripe invoice is not attached to an active BabyCam account" }, 400);
+              return await rejectActiveEvent({ error: "Stripe invoice is not attached to an active BabyCam account" }, 400);
             }
             const periodStart = new Date(Number(stripeSubscription.current_period_start) * 1000);
             const periodEnd = new Date(Number(stripeSubscription.current_period_end) * 1000);
@@ -294,7 +309,7 @@ serve(async (req) => {
           const invoice = event.data?.object || {};
           const subscriptionId = typeof invoice.subscription === "string"
             ? invoice.subscription
-            : invoice.subscription?.id;
+            : invoice.subscription?.id || invoice.parent?.subscription_details?.subscription;
           if (typeof subscriptionId === "string") {
             const { error } = await supabase.from("subscriptions").update({
               plan: "free",
