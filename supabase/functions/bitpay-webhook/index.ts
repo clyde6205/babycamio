@@ -93,28 +93,56 @@ serve(async (req) => {
       updated_at: new Date().toISOString(),
     };
 
+    const paymentValues = {
+      user_id: userId,
+      amount_cents: amountCents,
+      currency: (invoiceData.currency || "USD").toUpperCase(),
+      payment_provider: "bitpay",
+      provider_payment_id: invoiceId,
+      status: paymentStatus,
+      metadata: paymentMetadata,
+    };
     const { data: existingPayment, error: existingPaymentError } = await supabase
       .from("payments")
-      .select("id")
+      .select("id, user_id")
       .eq("provider_payment_id", invoiceId)
       .eq("payment_provider", "bitpay")
       .maybeSingle();
     if (existingPaymentError) throw existingPaymentError;
 
     if (existingPayment) {
-      const { error } = await supabase.from("payments").update({ status: paymentStatus, metadata: paymentMetadata }).eq("id", existingPayment.id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase.from("payments").insert({
-        user_id: userId,
+      if (existingPayment.user_id !== userId) throw new Error("BitPay invoice is already attached to a different account");
+      const { error } = await supabase.from("payments").update({
         amount_cents: amountCents,
-        currency: (invoiceData.currency || "USD").toUpperCase(),
-        payment_provider: "bitpay",
-        provider_payment_id: invoiceId,
+        currency: paymentValues.currency,
         status: paymentStatus,
         metadata: paymentMetadata,
-      });
+      }).eq("id", existingPayment.id);
       if (error) throw error;
+    } else {
+      const { error: insertError } = await supabase.from("payments").insert(paymentValues);
+      if (insertError?.code === "23505") {
+        // Another delivery may have inserted this invoice after our initial read.
+        const { data: racedPayment, error: racedReadError } = await supabase
+          .from("payments")
+          .select("id, user_id")
+          .eq("payment_provider", "bitpay")
+          .eq("provider_payment_id", invoiceId)
+          .maybeSingle();
+        if (racedReadError) throw racedReadError;
+        if (!racedPayment || racedPayment.user_id !== userId) {
+          throw new Error("BitPay invoice payment record could not be safely reconciled");
+        }
+        const { error: racedUpdateError } = await supabase.from("payments").update({
+          amount_cents: amountCents,
+          currency: paymentValues.currency,
+          status: paymentStatus,
+          metadata: paymentMetadata,
+        }).eq("id", racedPayment.id);
+        if (racedUpdateError) throw racedUpdateError;
+      } else if (insertError) {
+        throw insertError;
+      }
     }
 
     // BitPay considers confirmed/complete safe for goods delivery; "paid" is not final.
