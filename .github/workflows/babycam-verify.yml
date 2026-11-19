@@ -1,0 +1,61 @@
+name: BabyCam branch verification
+
+on:
+  push:
+    branches:
+      - fix/babycam-review-findings
+    paths-ignore:
+      - package-lock.json
+
+permissions:
+  contents: write
+
+concurrency:
+  group: babycam-branch-verification
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/babycam-review-findings
+          persist-credentials: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Reconcile dependencies and apply non-breaking security fixes
+        run: |
+          npm install --no-audit
+          npm audit fix || true
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Report remaining dependency advisories
+        if: always()
+        run: npm audit --json > audit-report.json || true
+
+      - name: Commit refreshed lockfile when changed
+        if: success()
+        run: |
+          if ! git diff --quiet -- package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "chore: refresh lockfile and patch safe dependency advisories [skip ci]"
+            git push origin HEAD:fix/babycam-review-findings
+          fi
