@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Activity, Baby, BatteryCharging, Bot, Camera, Cctv, Check, Copy, Crosshair, Crown,
+  Activity, Baby, BatteryCharging, Bot, Camera, Cctv, Crosshair, Crown,
   Download, Eye, Film, Gift, Heart, Loader2, LogOut, Moon, Plus, Ruler, Settings,
-  Share2, Shield, Smartphone, Star, Trash2, UserPlus, Video,
+  Shield, Smartphone, Star, Trash2, UserPlus, Video,
 } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useAppSettings } from "@/hooks/use-app-settings";
