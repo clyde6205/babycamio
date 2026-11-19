@@ -72,7 +72,7 @@ const blobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
   reader.readAsDataURL(blob);
 });
 
-const safeName = (name: string) => name.replace(/[^\w.\-]+/g, "_").slice(-120) || `babycam-${Date.now()}`;
+const safeName = (name: string) => name.replace(/[^\w.-]+/g, "_").slice(-120) || `babycam-${Date.now()}`;
 
 /** Browser download of a blob (real file, not a link). */
 export function downloadBlob(blob: Blob, name: string) {
