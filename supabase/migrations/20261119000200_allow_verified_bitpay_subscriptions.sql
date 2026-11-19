@@ -5,4 +5,4 @@ ALTER TABLE public.subscriptions
 
 ALTER TABLE public.subscriptions
   ADD CONSTRAINT subscriptions_payment_provider_check
-  CHECK (payment_provider IN ('stripe', 'paypal', 'paymongo', 'mpesa', 'bitpay'));
+  CHECK (payment_provider IN ('stripe', 'paypal', 'paymongo', 'mpesa', 'bitpay', 'admin_grant'));
