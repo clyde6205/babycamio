@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { ConnectionState } from "livekit-client";
 
@@ -17,6 +17,17 @@ const ConnectionStatus = ({ connectionState, onDisconnectAlarm }: ConnectionStat
   const audioCtxRef = useRef<AudioContext | null>(null);
   const oscRef = useRef<OscillatorNode | null>(null);
   const prevStateRef = useRef<ConnectionState>(connectionState);
+
+  const stopAlarm = useCallback(() => {
+    setAlarmActive(false);
+    try {
+      oscRef.current?.stop();
+    } catch { /* oscillator may already be stopped */ }
+    oscRef.current = null;
+    audioCtxRef.current?.close();
+    audioCtxRef.current = null;
+    if (navigator.vibrate) navigator.vibrate(0);
+  }, []);
 
   useEffect(() => {
     const wasConnected = prevStateRef.current === ConnectionState.Connected;
@@ -67,22 +78,13 @@ const ConnectionStatus = ({ connectionState, onDisconnectAlarm }: ConnectionStat
     }
 
     prevStateRef.current = connectionState;
-  }, [connectionState]);
+  }, [connectionState, alarmActive, onDisconnectAlarm, stopAlarm]);
 
-  const stopAlarm = () => {
-    setAlarmActive(false);
-    try {
-      oscRef.current?.stop();
-    } catch { /* oscillator may already be stopped */ }
-    oscRef.current = null;
-    audioCtxRef.current?.close();
-    audioCtxRef.current = null;
-    if (navigator.vibrate) navigator.vibrate(0);
-  };
+
 
   useEffect(() => {
     return () => stopAlarm();
-  }, []);
+  }, [stopAlarm]);
 
   if (connectionState === ConnectionState.Connected) {
     return (
