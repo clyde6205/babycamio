@@ -109,9 +109,9 @@ Build and sign the Android app from Android Studio. Do not commit keystores, `lo
 
 ## Security notes
 
-- Viewer links use room UUIDs, not guessable room slugs.
+- Anonymous viewer links use random per-invitation UUID tokens stored in `shared_access`; revoking a grant blocks new token issuance. Room primary keys are not anonymous share credentials.
 - Publishing requires an authenticated room owner.
-- Viewer tokens can subscribe, send data, and publish microphone audio for talkback, but cannot publish camera/screen sources.
+- Viewer tokens can subscribe and publish microphone audio for talkback, but cannot publish camera, screen, or LiveKit data packets.
 - Stripe, PayMongo, and BitPay webhook handlers reject unsigned or unconfigured requests.
 - Checkout success/cancel URLs are restricted to an origin allow-list.
 - Supabase service-role keys belong only in edge-function secrets.
