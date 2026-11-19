@@ -61,9 +61,11 @@ serve(async (req) => {
     }
 
     const userId = posData.user_id;
-    const plan = posData.plan === "pro" ? "pro" : "free";
-    const billing = posData.billing === "annual" ? "annual" : "monthly";
-    if (!userId || !UUID_PATTERN.test(userId)) return json({ error: "Missing or invalid user_id in posData" }, 400);
+    const plan = posData.plan;
+    const billing = posData.billing;
+    if (!userId || !UUID_PATTERN.test(userId) || plan !== "pro" || !["monthly", "annual"].includes(billing || "")) {
+      return json({ error: "Missing or invalid checkout metadata in verified BitPay invoice" }, 400);
+    }
 
     const paymentStatus = mapBitPayStatus(status);
     const amountCents = Number.isFinite(Number(invoiceData.price)) ? Math.round(Number(invoiceData.price) * 100) : 0;
@@ -108,7 +110,12 @@ serve(async (req) => {
 
     // BitPay considers confirmed/complete safe for goods delivery; "paid" is not final.
     if ((status === "confirmed" || status === "complete") && plan === "pro") {
-      const now = new Date();
+      // Anchor the subscription window to the immutable invoice creation time
+      // so repeated IPN deliveries do not extend the subscription repeatedly.
+      const invoiceCreatedAt = Number(invoiceData.invoiceTime);
+      const now = Number.isFinite(invoiceCreatedAt) && invoiceCreatedAt > 0
+        ? new Date(invoiceCreatedAt)
+        : new Date();
       const periodEnd = new Date(now);
       if (billing === "annual") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
       else periodEnd.setMonth(periodEnd.getMonth() + 1);
