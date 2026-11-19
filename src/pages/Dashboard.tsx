@@ -42,6 +42,7 @@ const Dashboard = () => {
   const { user, loading: authLoading } = useAutoAuth();
   const { config } = useAppSettings();
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [sharedRooms, setSharedRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [shareRoom, setShareRoom] = useState<Room | null>(null);
   const [creating, setCreating] = useState(false);
@@ -73,19 +74,26 @@ const Dashboard = () => {
   const fetchRooms = async () => {
     if (!user) {
       setRooms([]);
+      setSharedRooms([]);
       setLoading(false);
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
-      .from("rooms")
-      .select("id, room_name, is_active, room_type, created_at")
-      .eq("owner_id", user.id)
-      .order("created_at", { ascending: false });
-    if (error) {
-      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
-    } else if (data) {
-      setRooms(data as Room[]);
+    const [ownedResult, sharedResult] = await Promise.all([
+      supabase.from("rooms")
+        .select("id, room_name, is_active, room_type, created_at")
+        .eq("owner_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase.from("rooms")
+        .select("id, room_name, is_active, room_type, created_at")
+        .neq("owner_id", user.id)
+        .order("created_at", { ascending: false }),
+    ]);
+    if (ownedResult.error) {
+      toast({ title: t("common.error"), description: ownedResult.error.message, variant: "destructive" });
+    } else {
+      setRooms((ownedResult.data || []) as Room[]);
+      setSharedRooms((sharedResult.data || []) as Room[]);
     }
     setLoading(false);
   };
@@ -308,7 +316,7 @@ const Dashboard = () => {
 
         {loading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-        ) : rooms.length === 0 ? (
+        ) : rooms.length === 0 && sharedRooms.length === 0 ? (
           <div className="rounded-xl border-2 border-dashed p-8 text-center sm:p-12">
             <Eye className="mx-auto mb-3 h-12 w-12 text-primary/40" />
             <h3 className="mb-1 text-lg font-semibold">Welcome to BabyCam.io</h3>
@@ -352,6 +360,26 @@ const Dashboard = () => {
               </Card>
             ))}
           </div>
+        )}
+
+        {sharedRooms.length > 0 && (
+          <section className="mt-8 space-y-3" aria-labelledby="shared-rooms-heading">
+            <div>
+              <h2 id="shared-rooms-heading" className="text-lg font-bold">Shared with me</h2>
+              <p className="text-xs text-muted-foreground">Cameras other owners have shared with your account.</p>
+            </div>
+            {sharedRooms.map((room) => (
+              <Card key={room.id} className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <h3 className="truncate font-semibold capitalize">{roomDisplayName(room.room_name)}</h3>
+                  <p className="text-xs text-muted-foreground">{room.is_active ? "Live" : "Offline"} · Shared camera</p>
+                </div>
+                <Button className="touch-target shrink-0" onClick={() => navigate(`/viewer/${room.id}`)}>
+                  <Eye className="mr-1 h-4 w-4" /> Watch
+                </Button>
+              </Card>
+            ))}
+          </section>
         )}
 
         <MultiCameraGrid rooms={rooms} />
